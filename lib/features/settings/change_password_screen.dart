@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:vaultafe/shared/providers/auth_provider.dart';
+import 'package:vaultsafe/shared/providers/auth_provider.dart';
 
-/// Screen for changing master password
+/// 修改主密码界面
 class ChangePasswordScreen extends ConsumerStatefulWidget {
   const ChangePasswordScreen({super.key});
 
   @override
-  ConsumerState<ChangePasswordScreen> createState() _ChangePasswordScreenState();
+  ConsumerState<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
 }
 
 class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
@@ -22,7 +22,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Change Master Password'),
+        title: const Text('修改主密码'),
       ),
       body: Form(
         key: _formKey,
@@ -32,13 +32,13 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
             TextFormField(
               controller: _currentController,
               decoration: const InputDecoration(
-                labelText: 'Current Password',
+                labelText: '当前密码',
                 border: OutlineInputBorder(),
               ),
               obscureText: true,
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Enter your current password';
+                  return '请输入当前密码';
                 }
                 return null;
               },
@@ -47,16 +47,16 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
             TextFormField(
               controller: _newController,
               decoration: const InputDecoration(
-                labelText: 'New Password',
+                labelText: '新密码',
                 border: OutlineInputBorder(),
               ),
               obscureText: true,
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Enter a new password';
+                  return '请输入新密码';
                 }
                 if (value.length < 8) {
-                  return 'Password must be at least 8 characters';
+                  return '密码至少需要 8 个字符';
                 }
                 return null;
               },
@@ -65,16 +65,16 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
             TextFormField(
               controller: _confirmController,
               decoration: const InputDecoration(
-                labelText: 'Confirm New Password',
+                labelText: '确认新密码',
                 border: OutlineInputBorder(),
               ),
               obscureText: true,
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Confirm your new password';
+                  return '请确认新密码';
                 }
                 if (value != _newController.text) {
-                  return 'Passwords do not match';
+                  return '两次输入的密码不一致';
                 }
                 return null;
               },
@@ -91,7 +91,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                       width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Change Password'),
+                  : const Text('修改密码'),
             ),
           ],
         ),
@@ -117,11 +117,11 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
     if (success) {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password changed successfully')),
+        const SnackBar(content: Text('密码已成功修改')),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Current password is incorrect')),
+        const SnackBar(content: Text('当前密码不正确')),
       );
     }
   }

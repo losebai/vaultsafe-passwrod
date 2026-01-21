@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:vaultafe/shared/platform/platform_security.dart';
+import 'package:vaultsafe/shared/platform/platform_security.dart';
 
 /// Platform service for handling platform-specific functionality
 class PlatformService {

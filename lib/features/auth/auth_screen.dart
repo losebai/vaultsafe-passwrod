@@ -6,12 +6,12 @@ import 'package:vaultsafe/features/auth/setup_password_screen.dart';
 import 'package:vaultsafe/features/home/home_screen.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
 
-/// Authentication screen - handles master password entry and biometrics
+/// 认证界面 - 处理主密码输入和生物识别
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
 
   @override
-  ConsumerState<AuthScreen> createState() _AuthScreenState();
+  ConsumerState<AuthScreen> createState() => _AuthScreenState();
 }
 
 class _AuthScreenState extends ConsumerState<AuthScreen> {
@@ -62,7 +62,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       _navigateToHome();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Incorrect password')),
+        const SnackBar(content: Text('密码错误')),
       );
     }
   }
@@ -102,7 +102,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Enter your master password to unlock',
+                  '输入主密码解锁',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -113,7 +113,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   controller: _passwordController,
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
-                    labelText: 'Master Password',
+                    labelText: '主密码',
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
                       icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
@@ -124,7 +124,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please enter your password';
+                      return '请输入密码';
                     }
                     return null;
                   },
@@ -142,7 +142,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Unlock'),
+                      : const Text('解锁'),
                 ),
               ],
             ),

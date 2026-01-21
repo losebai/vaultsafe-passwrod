@@ -17,9 +17,10 @@ class FlutterWindow : public Win32Window {
 
  protected:
   // Win32Window:
-  bool CreateAndShow(const std::wstring& title,
-                     const Point& origin,
-                     const Size& size) override;
+  bool OnCreate() override;
+  void OnDestroy() override;
+  LRESULT MessageHandler(HWND window, UINT const message, WPARAM const wparam,
+                         LPARAM const lparam) noexcept override;
 
  private:
   // The project to run.

@@ -1,88 +1,135 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultsafe/core/storage/storage_service.dart';
 import 'package:vaultsafe/shared/models/password_entry.dart';
 import 'package:vaultsafe/shared/models/password_group.dart';
 
+/// Storage service provider
+final storageServiceProvider = Provider<StorageService>((ref) {
+  return StorageService();
+});
+
 /// Password entries notifier
 class PasswordEntriesNotifier extends StateNotifier<AsyncValue<List<PasswordEntry>>> {
-  PasswordEntriesNotifier() : super(const AsyncValue.loading());
+  PasswordEntriesNotifier(this._storageService) : super(const AsyncValue.loading()) {
+    loadEntries();
+  }
+
+  final StorageService _storageService;
 
   Future<void> loadEntries() async {
     state = const AsyncValue.loading();
     try {
-      // TODO: Load from local storage
-      state = const AsyncValue.data([]);
+      final entries = await _storageService.getPasswordEntries();
+      state = AsyncValue.data(entries);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
   }
 
   Future<void> addEntry(PasswordEntry entry) async {
-    state.whenData((entries) {
-      state = AsyncValue.data([...entries, entry]);
-    });
+    try {
+      await _storageService.savePasswordEntry(entry);
+      await loadEntries();
+    } catch (e, st) {
+      state.whenData((entries) {
+        state = AsyncValue.error(e, st);
+      });
+    }
   }
 
   Future<void> updateEntry(PasswordEntry entry) async {
-    state.whenData((entries) {
-      final updated = entries.map((e) => e.id == entry.id ? entry : e).toList();
-      state = AsyncValue.data(updated);
-    });
+    try {
+      await _storageService.savePasswordEntry(entry);
+      await loadEntries();
+    } catch (e, st) {
+      state.whenData((entries) {
+        state = AsyncValue.error(e, st);
+      });
+    }
   }
 
   Future<void> deleteEntry(String id) async {
-    state.whenData((entries) {
-      final filtered = entries.where((e) => e.id != id).toList();
-      state = AsyncValue.data(filtered);
-    });
+    try {
+      await _storageService.deletePasswordEntry(id);
+      await loadEntries();
+    } catch (e, st) {
+      state.whenData((entries) {
+        state = AsyncValue.error(e, st);
+      });
+    }
   }
 
   List<PasswordEntry> searchEntries(String query) {
-    return state.value ?? [];
+    final entries = state.value ?? [];
+    if (query.isEmpty) return entries;
+
+    return entries.where((e) =>
+        e.title.toLowerCase().contains(query.toLowerCase()) ||
+        e.username.toLowerCase().contains(query.toLowerCase())).toList();
   }
 }
 
 /// Password groups notifier
 class PasswordGroupsNotifier extends StateNotifier<AsyncValue<List<PasswordGroup>>> {
-  PasswordGroupsNotifier() : super(const AsyncValue.loading());
+  PasswordGroupsNotifier(this._storageService) : super(const AsyncValue.loading()) {
+    loadGroups();
+  }
+
+  final StorageService _storageService;
 
   Future<void> loadGroups() async {
     state = const AsyncValue.loading();
     try {
-      // TODO: Load from local storage
-      state = const AsyncValue.data([]);
+      final groups = await _storageService.getGroups();
+      state = AsyncValue.data(groups);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
   }
 
   Future<void> addGroup(PasswordGroup group) async {
-    state.whenData((groups) {
-      state = AsyncValue.data([...groups, group]);
-    });
+    try {
+      await _storageService.saveGroup(group);
+      await loadGroups();
+    } catch (e, st) {
+      state.whenData((groups) {
+        state = AsyncValue.error(e, st);
+      });
+    }
   }
 
   Future<void> updateGroup(PasswordGroup group) async {
-    state.whenData((groups) {
-      final updated = groups.map((g) => g.id == group.id ? group : g).toList();
-      state = AsyncValue.data(updated);
-    });
+    try {
+      await _storageService.saveGroup(group);
+      await loadGroups();
+    } catch (e, st) {
+      state.whenData((groups) {
+        state = AsyncValue.error(e, st);
+      });
+    }
   }
 
   Future<void> deleteGroup(String id) async {
-    state.whenData((groups) {
-      final filtered = groups.where((g) => g.id != id).toList();
-      state = AsyncValue.data(filtered);
-    });
+    try {
+      await _storageService.deleteGroup(id);
+      await loadGroups();
+    } catch (e, st) {
+      state.whenData((groups) {
+        state = AsyncValue.error(e, st);
+      });
+    }
   }
 }
 
 /// Providers
 final passwordEntriesProvider = StateNotifierProvider<PasswordEntriesNotifier, AsyncValue<List<PasswordEntry>>>((ref) {
-  return PasswordEntriesNotifier();
+  final storageService = ref.watch(storageServiceProvider);
+  return PasswordEntriesNotifier(storageService);
 });
 
 final passwordGroupsProvider = StateNotifierProvider<PasswordGroupsNotifier, AsyncValue<List<PasswordGroup>>>((ref) {
-  return PasswordGroupsNotifier();
+  final storageService = ref.watch(storageServiceProvider);
+  return PasswordGroupsNotifier(storageService);
 });
 
 /// Filtered entries by group

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultsafe/features/settings/change_password_screen.dart';
-import 'package:vaultafe/features/settings/sync_settings_screen.dart';
-import 'package:vaultafe/shared/providers/settings_provider.dart';
+import 'package:vaultsafe/features/settings/sync_settings_screen.dart';
+import 'package:vaultsafe/shared/providers/settings_provider.dart';
 
-/// Settings screen
+/// 设置界面
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -14,23 +14,23 @@ class SettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text('设置'),
       ),
       body: settingsAsync.when(
         data: (settings) {
           return ListView(
             children: [
-              const _SectionHeader(title: 'Security'),
+              const _SectionHeader(title: '安全'),
               SwitchListTile(
-                title: const Text('Biometric Unlock'),
-                subtitle: const Text('Use fingerprint or face to unlock'),
+                title: const Text('生物识别解锁'),
+                subtitle: const Text('使用指纹或面部识别解锁'),
                 value: settings.biometricEnabled,
                 onChanged: (value) {
                   ref.read(settingsProvider.notifier).updateBiometricEnabled(value);
                 },
               ),
               ListTile(
-                title: const Text('Change Master Password'),
+                title: const Text('修改主密码'),
                 leading: const Icon(Icons.lock_reset),
                 onTap: () {
                   Navigator.of(context).push(
@@ -39,16 +39,16 @@ class SettingsScreen extends ConsumerWidget {
                 },
               ),
               ListTile(
-                title: const Text('Auto-lock Timeout'),
+                title: const Text('自动锁定时间'),
                 subtitle: Text(_formatTimeout(settings.autoLockTimeout)),
                 leading: const Icon(Icons.timer),
                 onTap: () => _showTimeoutDialog(context, ref, settings.autoLockTimeout),
               ),
 
-              const _SectionHeader(title: 'Sync'),
+              const _SectionHeader(title: '同步'),
               SwitchListTile(
-                title: const Text('Enable Sync'),
-                subtitle: const Text('Synchronize encrypted data across devices'),
+                title: const Text('启用同步'),
+                subtitle: const Text('在设备间同步加密数据'),
                 value: settings.syncEnabled,
                 onChanged: (value) {
                   ref.read(settingsProvider.notifier).updateSyncEnabled(value);
@@ -60,8 +60,8 @@ class SettingsScreen extends ConsumerWidget {
                 },
               ),
               ListTile(
-                title: const Text('Sync Configuration'),
-                subtitle: Text(settings.syncConfig?.endpointUrl ?? 'Not configured'),
+                title: const Text('同步配置'),
+                subtitle: Text(settings.syncConfig?.endpointUrl ?? '未配置'),
                 leading: const Icon(Icons.cloud_sync),
                 onTap: () {
                   Navigator.of(context).push(
@@ -70,23 +70,23 @@ class SettingsScreen extends ConsumerWidget {
                 },
               ),
 
-              const _SectionHeader(title: 'Data'),
+              const _SectionHeader(title: '数据'),
               ListTile(
-                title: const Text('Export Backup'),
-                subtitle: const Text('Download encrypted backup file'),
+                title: const Text('导出备份'),
+                subtitle: const Text('下载加密备份文件'),
                 leading: const Icon(Icons.download),
                 onTap: () => _exportBackup(context, ref),
               ),
               ListTile(
-                title: const Text('Import Backup'),
-                subtitle: const Text('Restore from encrypted backup file'),
+                title: const Text('导入备份'),
+                subtitle: const Text('从加密备份文件恢复'),
                 leading: const Icon(Icons.upload),
                 onTap: () => _importBackup(context, ref),
               ),
 
-              const _SectionHeader(title: 'About'),
+              const _SectionHeader(title: '关于'),
               ListTile(
-                title: const Text('Version'),
+                title: const Text('版本'),
                 subtitle: const Text('1.0.0'),
                 leading: const Icon(Icons.info),
               ),
@@ -94,16 +94,16 @@ class SettingsScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err')),
+        error: (err, stack) => Center(child: Text('错误: $err')),
       ),
     );
   }
 
   String _formatTimeout(Duration timeout) {
     if (timeout.inMinutes >= 1) {
-      return '${timeout.inMinutes} minute(s)';
+      return '${timeout.inMinutes} 分钟';
     }
-    return '${timeout.inSeconds} second(s)';
+    return '${timeout.inSeconds} 秒';
   }
 
   void _showTimeoutDialog(BuildContext context, WidgetRef ref, Duration current) {
@@ -118,7 +118,7 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Auto-lock Timeout'),
+          title: const Text('自动锁定时间'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: timeouts.map((timeout) {
@@ -141,16 +141,16 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Future<void> _exportBackup(BuildContext context, WidgetRef ref) async {
-    // TODO: Implement backup export
+    // TODO: 实现备份导出
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Backup exported')),
+      const SnackBar(content: Text('备份已导出')),
     );
   }
 
   Future<void> _importBackup(BuildContext context, WidgetRef ref) async {
-    // TODO: Implement backup import
+    // TODO: 实现备份导入
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Backup imported')),
+      const SnackBar(content: Text('备份已导入')),
     );
   }
 }

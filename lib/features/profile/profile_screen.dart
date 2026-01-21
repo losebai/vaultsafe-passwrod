@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:vaultafe/shared/providers/settings_provider.dart';
+import 'package:vaultsafe/shared/providers/settings_provider.dart';
 
-/// Profile screen showing account info and device list
+/// 个人中心界面
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -11,12 +11,12 @@ class ProfileScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: const Text('我的'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // User info card
+          // 用户信息卡片
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -32,12 +32,12 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'VaultSafe User',
+                    'VaultSafe 用户',
                     style: theme.textTheme.titleLarge,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Local encrypted storage',
+                    '本地加密存储',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -48,7 +48,7 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          // Statistics
+          // 统计信息
           Card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -56,23 +56,23 @@ class ProfileScreen extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Text(
-                    'Statistics',
+                    '统计',
                     style: theme.textTheme.titleMedium,
                   ),
                 ),
                 const ListTile(
                   leading: Icon(Icons.password),
-                  title: Text('Total Passwords'),
-                  trailing: Text('0'), // TODO: Get actual count
+                  title: Text('密码总数'),
+                  trailing: Text('0'), // TODO: 获取实际数量
                 ),
                 const ListTile(
                   leading: Icon(Icons.folder),
-                  title: Text('Groups'),
+                  title: Text('分组'),
                   trailing: Text('0'),
                 ),
                 const ListTile(
                   leading: Icon(Icons.lock),
-                  title: Text('Encryption'),
+                  title: Text('加密方式'),
                   trailing: Text('AES-256-GCM'),
                 ),
               ],
@@ -80,7 +80,7 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          // Security info
+          // 安全信息
           Card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,26 +88,26 @@ class ProfileScreen extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Text(
-                    'Security',
+                    '安全',
                     style: theme.textTheme.titleMedium,
                   ),
                 ),
                 const ListTile(
                   leading: Icon(Icons.verified_user),
-                  title: Text('Zero Knowledge'),
-                  subtitle: Text('Your data never leaves this device unencrypted'),
+                  title: Text('零知识架构'),
+                  subtitle: Text('您的数据永远不会以未加密形式离开此设备'),
                 ),
                 const ListTile(
                   leading: Icon(Icons.enhanced_encryption),
-                  title: Text('End-to-End Encryption'),
-                  subtitle: Text('All data encrypted with your master password'),
+                  title: Text('端到端加密'),
+                  subtitle: Text('所有数据使用您的主密码加密'),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 24),
 
-          // App info
+          // 应用信息
           Card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,16 +115,16 @@ class ProfileScreen extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Text(
-                    'About',
+                    '关于',
                     style: theme.textTheme.titleMedium,
                   ),
                 ),
                 const ListTile(
-                  title: Text('Version'),
+                  title: Text('版本'),
                   trailing: Text('1.0.0'),
                 ),
                 const ListTile(
-                  title: Text('License'),
+                  title: Text('许可证'),
                   trailing: Text('MIT'),
                 ),
               ],

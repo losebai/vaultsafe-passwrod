@@ -1,7 +1,7 @@
 import 'dart:typed_data';
-import 'package:pointycastle/export.dart';
-import 'package:crypto/crypto.dart';
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
+import 'package:pointycastle/export.dart';
 import 'package:convert/convert.dart';
 
 /// Encryption service using PBKDF2 + AES-256-GCM
@@ -14,7 +14,8 @@ class EncryptionService {
 
   /// Derive master key from master password using PBKDF2-HMAC-SHA256
   static Uint8List deriveKey(String password, Uint8List salt) {
-    final pkcs = PBKDF2KeyDerivator(HMAC(SHA256Digest(), 64));
+    final mac = HMac(SHA256Digest(), 64);
+    final pkcs = PBKDF2KeyDerivator(mac);
 
     final params = Pbkdf2Parameters(
       salt,
@@ -22,7 +23,7 @@ class EncryptionService {
       _keySize,
     );
 
-    pkcs.init(CipherParameters(null, null, params));
+    pkcs.init(params);
 
     final key = pkcs.process(Uint8List.fromList(utf8.encode(password)));
     return key as Uint8List;
@@ -30,7 +31,6 @@ class EncryptionService {
 
   /// Generate a random salt for key derivation
   static Uint8List generateSalt() {
-    final params = KeyParameters(_keySize);
     final random = FortunaRandom();
     random.seed(KeyParameter(_generateRandomSeed()));
 
@@ -40,7 +40,6 @@ class EncryptionService {
 
   /// Generate random nonce for AES-GCM
   static Uint8List generateNonce() {
-    final params = KeyParameters(_nonceSize);
     final random = FortunaRandom();
     random.seed(KeyParameter(_generateRandomSeed()));
 
@@ -71,17 +70,17 @@ class EncryptionService {
     final actualCiphertext = ciphertext.sublist(0, tagStart);
 
     return EncryptedData(
-      nonce: base64Encode(nonce),
-      ciphertext: base64Encode(actualCiphertext),
-      tag: base64Encode(tag),
+      nonce: base64.encode(nonce),
+      ciphertext: base64.encode(actualCiphertext),
+      tag: base64.encode(tag),
     );
   }
 
   /// Decrypt data using AES-256-GCM
   static String decrypt(EncryptedData encrypted, Uint8List key) {
-    final nonce = base64Decode(encrypted.nonce);
-    final ciphertext = base64Decode(encrypted.ciphertext);
-    final tag = base64Decode(encrypted.tag);
+    final nonce = base64.decode(encrypted.nonce);
+    final ciphertext = base64.decode(encrypted.ciphertext);
+    final tag = base64.decode(encrypted.tag);
 
     final cipher = GCMBlockCipher(AESEngine());
     final params = AEADParameters(KeyParameter(key), 128, nonce, Uint8List(0));

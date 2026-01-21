@@ -3,38 +3,50 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:vaultsafe/core/encryption/encryption_service.dart';
-import 'package:vaultsafe/features/auth/auth_service.dart';
 import 'package:vaultsafe/shared/models/password_entry.dart';
-import 'package:vaultafe/shared/providers/password_provider.dart';
-import 'package:vaultafe/shared/providers/auth_provider.dart';
-import 'package:vaultafe/shared/utils/password_generator.dart';
+import 'package:vaultsafe/shared/providers/password_provider.dart';
+import 'package:vaultsafe/shared/providers/auth_provider.dart';
+import 'package:vaultsafe/shared/utils/password_generator.dart';
 
-/// Screen for adding or editing a password entry
+/// 添加或编辑密码界面
 class AddPasswordScreen extends ConsumerStatefulWidget {
-  const AddPasswordScreen({super.key});
+  final PasswordEntry? entry;
+
+  const AddPasswordScreen({super.key, this.entry});
 
   @override
-  ConsumerState<AddPasswordScreen> createState() _AddPasswordScreenState();
+  ConsumerState<AddPasswordScreen> createState() => _AddPasswordScreenState();
 }
 
 class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _websiteController = TextEditingController();
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _notesController = TextEditingController();
+  late final TextEditingController _titleController;
+  late final TextEditingController _websiteController;
+  late final TextEditingController _usernameController;
+  late final TextEditingController _passwordController;
+  late final TextEditingController _notesController;
 
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _isEditMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isEditMode = widget.entry != null;
+
+    _titleController = TextEditingController(text: widget.entry?.title ?? '');
+    _websiteController = TextEditingController(text: widget.entry?.website ?? '');
+    _usernameController = TextEditingController(text: widget.entry?.username ?? '');
+    _passwordController = TextEditingController(text: '');
+    _notesController = TextEditingController(text: widget.entry?.notes ?? '');
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Password'),
+        title: Text(_isEditMode ? '编辑密码' : '添加密码'),
       ),
       body: Form(
         key: _formKey,
@@ -44,13 +56,13 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
             TextFormField(
               controller: _titleController,
               decoration: const InputDecoration(
-                labelText: 'Title',
+                labelText: '标题',
                 border: OutlineInputBorder(),
-                hintText: 'e.g., Google Account',
+                hintText: '例如：Google 账号',
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter a title';
+                  return '请输入标题';
                 }
                 return null;
               },
@@ -59,13 +71,13 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
             TextFormField(
               controller: _websiteController,
               decoration: const InputDecoration(
-                labelText: 'Website',
+                labelText: '网站',
                 border: OutlineInputBorder(),
-                hintText: 'e.g., https://google.com',
+                hintText: '例如：https://google.com',
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter a website';
+                  return '请输入网站';
                 }
                 return null;
               },
@@ -74,12 +86,12 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
             TextFormField(
               controller: _usernameController,
               decoration: const InputDecoration(
-                labelText: 'Username / Email',
+                labelText: '用户名 / 邮箱',
                 border: OutlineInputBorder(),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter a username';
+                  return '请输入用户名';
                 }
                 return null;
               },
@@ -89,15 +101,15 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
               controller: _passwordController,
               obscureText: _obscurePassword,
               decoration: InputDecoration(
-                labelText: 'Password',
+                labelText: _isEditMode ? '新密码（留空保持不变）' : '密码',
                 border: const OutlineInputBorder(),
                 suffixIcon: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.generate),
+                      icon: const Icon(Icons.refresh),
                       onPressed: _generatePassword,
-                      tooltip: 'Generate password',
+                      tooltip: '生成密码',
                     ),
                     IconButton(
                       icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
@@ -109,8 +121,8 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
                 ),
               ),
               validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a password';
+                if (!_isEditMode && (value == null || value.isEmpty)) {
+                  return '请输入密码';
                 }
                 return null;
               },
@@ -119,7 +131,7 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
             TextFormField(
               controller: _notesController,
               decoration: const InputDecoration(
-                labelText: 'Notes (optional)',
+                labelText: '备注（可选）',
                 border: OutlineInputBorder(),
               ),
               maxLines: 3,
@@ -136,7 +148,7 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
                       width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Save Password'),
+                  : Text(_isEditMode ? '更新密码' : '保存密码'),
             ),
           ],
         ),
@@ -154,36 +166,40 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
       final masterKey = authService.masterKey;
 
       if (masterKey == null) {
-        throw Exception('Vault is locked');
+        throw Exception('密码库已锁定');
       }
 
       final encrypted = EncryptionService.encrypt(_passwordController.text, masterKey);
 
       final entry = PasswordEntry(
-        id: const Uuid().v4(),
+        id: widget.entry?.id ?? const Uuid().v4(),
         title: _titleController.text,
         website: _websiteController.text,
         username: _usernameController.text,
         encryptedPassword: encrypted,
         notes: _notesController.text.isEmpty ? null : _notesController.text,
-        groupId: 'default', // TODO: Allow group selection
-        createdAt: DateTime.now(),
+        groupId: widget.entry?.groupId ?? 'default',
+        createdAt: widget.entry?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
       );
 
-      await ref.read(passwordEntriesProvider.notifier).addEntry(entry);
+      if (_isEditMode) {
+        await ref.read(passwordEntriesProvider.notifier).updateEntry(entry);
+      } else {
+        await ref.read(passwordEntriesProvider.notifier).addEntry(entry);
+      }
 
       if (!mounted) return;
 
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password saved')),
+        SnackBar(content: Text(_isEditMode ? '密码已更新' : '密码已保存')),
       );
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(content: Text('错误: $e')),
       );
     } finally {
       if (mounted) {

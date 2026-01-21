@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
 
-/// Setup screen for creating a new master password
+/// 设置主密码界面
 class SetupPasswordScreen extends ConsumerStatefulWidget {
   const SetupPasswordScreen({super.key});
 
   @override
-  ConsumerState<SetupPasswordScreen> createState() _SetupPasswordScreenState();
+  ConsumerState<SetupPasswordScreen> createState() => _SetupPasswordScreenState();
 }
 
 class _SetupPasswordScreenState extends ConsumerState<SetupPasswordScreen> {
@@ -21,7 +21,7 @@ class _SetupPasswordScreenState extends ConsumerState<SetupPasswordScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Setup VaultSafe')),
+      appBar: AppBar(title: const Text('设置 VaultSafe')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -37,12 +37,12 @@ class _SetupPasswordScreenState extends ConsumerState<SetupPasswordScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Create your master password',
+                  '创建您的主密码',
                   style: theme.textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'This password encrypts all your data. Make it strong and don\'t forget it - it cannot be recovered!',
+                  '此密码将加密您所有数据。请设置一个强密码并牢记 - 它无法被恢复！',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -51,17 +51,17 @@ class _SetupPasswordScreenState extends ConsumerState<SetupPasswordScreen> {
                 TextFormField(
                   controller: _passwordController,
                   decoration: const InputDecoration(
-                    labelText: 'Master Password',
+                    labelText: '主密码',
                     border: OutlineInputBorder(),
-                    helperText: 'At least 8 characters',
+                    helperText: '至少 8 个字符',
                   ),
                   obscureText: true,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please enter a password';
+                      return '请输入密码';
                     }
                     if (value.length < 8) {
-                      return 'Password must be at least 8 characters';
+                      return '密码至少需要 8 个字符';
                     }
                     return null;
                   },
@@ -70,16 +70,16 @@ class _SetupPasswordScreenState extends ConsumerState<SetupPasswordScreen> {
                 TextFormField(
                   controller: _confirmController,
                   decoration: const InputDecoration(
-                    labelText: 'Confirm Password',
+                    labelText: '确认密码',
                     border: OutlineInputBorder(),
                   ),
                   obscureText: true,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please confirm your password';
+                      return '请确认密码';
                     }
                     if (value != _passwordController.text) {
-                      return 'Passwords do not match';
+                      return '两次输入的密码不一致';
                     }
                     return null;
                   },
@@ -96,7 +96,7 @@ class _SetupPasswordScreenState extends ConsumerState<SetupPasswordScreen> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Create Vault'),
+                      : const Text('创建密码库'),
                 ),
               ],
             ),
@@ -118,7 +118,7 @@ class _SetupPasswordScreenState extends ConsumerState<SetupPasswordScreen> {
 
     setState(() => _isLoading = false);
 
-    // Navigate to home screen
+    // 导航到主界面
     Navigator.of(context).pushReplacementNamed('/');
   }
 

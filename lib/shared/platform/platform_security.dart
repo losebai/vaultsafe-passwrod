@@ -3,19 +3,6 @@ import 'package:flutter/foundation.dart';
 
 /// Platform-specific security features
 class PlatformSecurity {
-  /// Get current platform
-  static TargetPlatform get platform {
-    if (kIsWeb) {
-      return TargetPlatform.web; // Custom value for web
-    }
-    return Theme.of(getCurrentContext()).platform;
-  }
-
-  static BuildContext getCurrentContext() {
-    // This is a placeholder - actual implementation depends on context
-    throw UnimplementedError('Use MediaQuery.platform instead');
-  }
-
   /// Check if platform supports biometric authentication
   static bool supportsBiometrics() {
     if (kIsWeb) return false;

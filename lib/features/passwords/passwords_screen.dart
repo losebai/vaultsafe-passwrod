@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:vaultafe/shared/providers/password_provider.dart';
-import 'package:vaultafe/features/passwords/add_password_screen.dart';
+import 'package:vaultsafe/shared/providers/password_provider.dart';
+import 'package:vaultsafe/features/passwords/add_password_screen.dart';
+import 'package:vaultsafe/features/passwords/password_detail_screen.dart';
 
-/// Passwords list screen
+/// 密码列表界面
 class PasswordsScreen extends ConsumerStatefulWidget {
   const PasswordsScreen({super.key});
 
   @override
-  ConsumerState<PasswordsScreen> createState() _PasswordsScreenState();
+  ConsumerState<PasswordsScreen> createState() => _PasswordsScreenState();
 }
 
 class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
@@ -27,11 +28,12 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Passwords'),
+        title: const Text('密码'),
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: _showSearch,
+            tooltip: '搜索',
           ),
         ],
       ),
@@ -59,12 +61,12 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'No passwords yet',
+                          '还没有密码',
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Tap + to add your first password',
+                          '点击 + 添加第一个密码',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: Theme.of(context).colorScheme.onSurfaceVariant,
                               ),
@@ -83,7 +85,7 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, stack) => Center(child: Text('Error: $err')),
+              error: (err, stack) => Center(child: Text('错误: $err')),
             ),
           ),
         ],
@@ -94,6 +96,7 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
             MaterialPageRoute(builder: (_) => const AddPasswordScreen()),
           );
         },
+        tooltip: '添加密码',
         child: const Icon(Icons.add),
       ),
     );
@@ -107,16 +110,15 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
           FilterChip(
-            label: const Text('All'),
+            label: const Text('全部'),
             selected: _selectedGroupId == null,
             onSelected: (selected) {
               setState(() => _selectedGroupId = selected ? null : _selectedGroupId);
             },
           ),
           const SizedBox(width: 8),
-          // TODO: Add actual groups
           FilterChip(
-            label: const Text('Personal'),
+            label: const Text('个人'),
             selected: _selectedGroupId == 'personal',
             onSelected: (selected) {
               setState(() => _selectedGroupId = selected ? 'personal' : null);
@@ -124,7 +126,7 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
           ),
           const SizedBox(width: 8),
           FilterChip(
-            label: const Text('Work'),
+            label: const Text('工作'),
             selected: _selectedGroupId == 'work',
             onSelected: (selected) {
               setState(() => _selectedGroupId = selected ? 'work' : null);
@@ -145,11 +147,16 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
       trailing: IconButton(
         icon: const Icon(Icons.copy),
         onPressed: () {
-          // TODO: Copy password
+          // TODO: 复制用户名
         },
+        tooltip: '复制',
       ),
       onTap: () {
-        // TODO: Navigate to detail
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PasswordDetailScreen(entry: entry),
+          ),
+        );
       },
     );
   }
@@ -162,11 +169,14 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
   }
 }
 
-/// Search delegate for passwords
+/// 密码搜索代理
 class PasswordSearchDelegate extends SearchDelegate<String> {
   final WidgetRef ref;
 
   PasswordSearchDelegate(this.ref);
+
+  @override
+  String get searchFieldLabel => '搜索密码';
 
   @override
   List<Widget> buildActions(BuildContext context) {
@@ -176,6 +186,7 @@ class PasswordSearchDelegate extends SearchDelegate<String> {
         onPressed: () {
           query = '';
         },
+        tooltip: '清空',
       ),
     ];
   }
@@ -187,6 +198,7 @@ class PasswordSearchDelegate extends SearchDelegate<String> {
       onPressed: () {
         close(context, '');
       },
+      tooltip: '返回',
     );
   }
 
@@ -207,6 +219,10 @@ class PasswordSearchDelegate extends SearchDelegate<String> {
                 e.title.toLowerCase().contains(query.toLowerCase()) ||
                 e.username.toLowerCase().contains(query.toLowerCase())).toList();
 
+        if (results.isEmpty) {
+          return const Center(child: Text('没有找到匹配的密码'));
+        }
+
         return ListView.builder(
           itemCount: results.length,
           itemBuilder: (context, index) {
@@ -216,13 +232,18 @@ class PasswordSearchDelegate extends SearchDelegate<String> {
               subtitle: Text(entry.username),
               onTap: () {
                 close(context, entry.id);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PasswordDetailScreen(entry: entry),
+                  ),
+                );
               },
             );
           },
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(child: Text('Error: $err')),
+      error: (err, stack) => Center(child: Text('错误: $err')),
     );
   }
 }

@@ -1,7 +1,8 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:vaultsafe/core/sync/sync_auth_type.dart';
 import 'package:vaultsafe/core/sync/sync_config.dart';
-import 'package:vaultsafe/core/encryption/encryption_service.dart';
 import 'package:uuid/uuid.dart';
 
 /// Sync service for encrypted data synchronization
@@ -101,7 +102,7 @@ class SyncService {
       case SyncAuthType.basic:
         final username = _config!.username ?? '';
         final password = await _getDecryptedPassword();
-        final credentials = base64Encode(
+        final credentials = base64.encode(
           utf8.encode('$username:$password'),
         );
         headers['Authorization'] = 'Basic $credentials';

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
@@ -8,10 +9,43 @@ class AuthService {
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   final LocalAuthentication _localAuth = LocalAuthentication();
 
+  static AuthService? _instance;
+  static bool _isInitialized = false;
+
   Uint8List? _masterKey;
   Uint8List? _salt;
 
   Uint8List? get masterKey => _masterKey;
+
+  // 私有构造，防止外部直接 new
+  AuthService._internal();
+
+  /// Initialize the AuthService singleton
+  static Future<AuthService> initialize() async {
+    if (_isInitialized && _instance != null) {
+      return _instance!;
+    }
+
+    // 创建单例实例
+    _instance = AuthService._internal();
+
+    // 执行所有异步安全初始化
+    // 检查是否已设置主密码
+    // 注意：这里不读取 master_hash，因为那是验证器的一部分
+    // 实际的验证逻辑在 hasMasterPassword() 方法中
+
+    _isInitialized = true;
+    return _instance!;
+  }
+
+  /// Get the current AuthService instance
+  static AuthService get instance {
+    if (_instance == null) {
+      throw StateError('AuthService must be initialized first. Call AuthService.initialize() first.');
+    }
+    return _instance!;
+  }
+
 
   /// Check if user has set up master password
   Future<bool> hasMasterPassword() async {
@@ -35,7 +69,7 @@ class AuthService {
 
     await _secureStorage.write(
       key: 'password_verifier',
-      value: verifier.toJson().toString(),
+      value: jsonEncode(verifier.toJson()),
     );
 
     _masterKey = key;
@@ -58,16 +92,9 @@ class AuthService {
       final verifierJson = await _secureStorage.read(key: 'password_verifier');
       if (verifierJson == null) return false;
 
-      // Parse verifier (simplified)
+      final verifierData = jsonDecode(verifierJson) as Map<String, dynamic>;
       final decrypted = EncryptionService.decrypt(
-        EncryptedData.fromJson(
-          Map<String, dynamic>.from(
-            verifierJson.replaceAll('{', '').replaceAll('}', '').split(',').map((e) {
-              final parts = e.split(':');
-              return MapEntry(parts[0].trim().replaceAll("'", ''), parts[1].trim().replaceAll("'", ''));
-            }),
-          ),
-        ),
+        EncryptedData.fromJson(verifierData),
         key,
       );
 

@@ -3,12 +3,12 @@ import 'package:vaultsafe/features/passwords/passwords_screen.dart';
 import 'package:vaultsafe/features/settings/settings_screen.dart';
 import 'package:vaultsafe/features/profile/profile_screen.dart';
 
-/// Main home screen with bottom navigation
+/// 主界面 - 底部导航
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() _HomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
@@ -35,15 +35,15 @@ class _HomeScreenState extends State<HomeScreen> {
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.password_rounded),
-            label: 'Passwords',
+            label: '密码',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_rounded),
-            label: 'Profile',
+            label: '我的',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_rounded),
-            label: 'Settings',
+            label: '设置',
           ),
         ],
       ),
