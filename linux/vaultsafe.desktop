@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=VaultSafe
+Comment=Secure, end-to-end encrypted password manager
+Exec=vaultsafe
+Icon=vaultsafe
+Terminal=false
+Categories=Utility;Security;GTK;
+Keywords=password;manager;security;encryption;
+StartupNotify=true

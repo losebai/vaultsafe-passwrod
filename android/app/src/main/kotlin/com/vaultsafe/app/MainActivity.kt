@@ -5,8 +5,14 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugins.GeneratedPluginRegistrant
 
 class MainActivity: FlutterFragmentActivity() {
+    private lateinit var platformHandler: PlatformHandler
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         GeneratedPluginRegistrant.registerWith(flutterEngine)
+
+        // Register platform handler
+        platformHandler = PlatformHandler(this)
+        platformHandler.registerWith(flutterEngine.dartExecutor.binaryMessenger)
     }
 
     // Prevent screenshots for security
