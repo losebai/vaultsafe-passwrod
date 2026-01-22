@@ -8,24 +8,21 @@ import 'package:vaultsafe/shared/providers/password_provider.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
 
 void main() async {
-  // 保 Flutter 的 Widgets 绑定（binding）在使用任何依赖于它的功能之前已被正确初始化
+  // 确保 Flutter 的 Widgets 绑定在使用任何依赖于它的功能之前已被正确初始化
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 初始化认证服务
-  await AuthService.initialize();
-
-  // 初始化本地存储服务
+  // 初始化本地存储服务（先初始化存储以获取设置）
   final storageService = StorageService();
   await storageService.init();
+
+  // 初始化认证服务
+  final authService = await AuthService.initialize();
 
   // 设置屏幕方向限制（在 runApp 之前！）win不生效，部分chrome不生效
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-
-  // 🔐 关键：在这里完成所有异步安全初始化
-  final authService = await AuthService.initialize(); // 自定义静态初始化方法
 
   // 运行应用程序
   runApp(

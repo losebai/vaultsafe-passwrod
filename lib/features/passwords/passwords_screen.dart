@@ -1,7 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import 'package:vaultsafe/shared/providers/password_provider.dart';
-import 'package:vaultsafe/features/passwords/add_password_screen.dart';
+import 'package:vaultsafe/shared/providers/auth_provider.dart';
+import 'package:vaultsafe/shared/models/password_entry.dart';
+import 'package:vaultsafe/shared/models/password_entry_type.dart';
+import 'package:vaultsafe/core/encryption/encryption_service.dart';
+import 'package:vaultsafe/shared/utils/password_generator.dart';
 import 'package:vaultsafe/features/passwords/password_detail_screen.dart';
 
 /// 密码列表界面
@@ -15,6 +21,17 @@ class PasswordsScreen extends ConsumerStatefulWidget {
 class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
   String _searchQuery = '';
   String? _selectedGroupId;
+  final Set<String> _selectedIds = {};
+  bool _isSelectionMode = false;
+  bool _isRightPanelOpen = false;
+
+  // 默认分组列表
+  final List<String> _defaultGroups = ['personal', 'work'];
+  // 自定义分组列表
+  final List<String> _customGroups = [];
+
+  // 检测是否为桌面平台
+  bool get _isDesktop => Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 
   @override
   void initState() {
@@ -25,7 +42,111 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
   @override
   Widget build(BuildContext context) {
     final entriesAsync = ref.watch(entriesByGroupProvider(_selectedGroupId));
+    final theme = Theme.of(context);
 
+    // 桌面端布局
+    if (_isDesktop) {
+      return Scaffold(
+        body: Row(
+          children: [
+            // 主内容区域
+            Expanded(
+              child: Column(
+                children: [
+                  // 顶部工具栏
+                  _buildDesktopToolbar(theme),
+                  // 分组筛选
+                  _buildGroupFilter(),
+                  // 选择模式提示栏
+                  if (_isSelectionMode)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                      child: Row(
+                        children: [
+                          Text(
+                            '已选择 ${_selectedIds.length} 项',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          TextButton(
+                            onPressed: _selectAll,
+                            child: const Text('全选'),
+                          ),
+                          TextButton(
+                            onPressed: _clearSelection,
+                            child: const Text('取消'),
+                          ),
+                          if (_selectedIds.isNotEmpty)
+                            FilledButton.tonalIcon(
+                              onPressed: _deleteSelected,
+                              icon: const Icon(Icons.delete, size: 18),
+                              label: const Text('删除'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: theme.colorScheme.errorContainer,
+                                foregroundColor: theme.colorScheme.onErrorContainer,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  // 密码列表
+                  Expanded(
+                    child: entriesAsync.when(
+                      data: (entries) {
+                        final filtered = _searchQuery.isEmpty
+                            ? entries
+                            : entries.where((e) =>
+                                e.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                                e.username.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+
+                        if (filtered.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.lock_open_rounded,
+                                  size: 64,
+                                  color: theme.colorScheme.outline,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  '还没有密码',
+                                  style: theme.textTheme.titleLarge,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '点击右侧按钮添加第一个密码',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                        color: theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return _buildDesktopGrid(filtered);
+                      },
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (err, stack) => Center(child: Text('错误: $err')),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // 右侧面板（添加/编辑密码）
+            _buildRightPanel(theme),
+          ],
+        ),
+      );
+    }
+
+    // 移动端布局
     return Scaffold(
       appBar: AppBar(
         title: const Text('密码'),
@@ -35,11 +156,18 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
             onPressed: _showSearch,
             tooltip: '搜索',
           ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: () => _toggleRightPanel(),
+            tooltip: '添加',
+          ),
         ],
       ),
       body: Column(
         children: [
           _buildGroupFilter(),
+          if (_isSelectionMode)
+            _buildSelectionBar(theme),
           Expanded(
             child: entriesAsync.when(
               data: (entries) {
@@ -50,39 +178,10 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                         e.username.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
 
                 if (filtered.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.lock_open_rounded,
-                          size: 64,
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          '还没有密码',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '点击 + 添加第一个密码',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                        ),
-                      ],
-                    ),
-                  );
+                  return _buildEmptyState(theme);
                 }
 
-                return ListView.builder(
-                  itemCount: filtered.length,
-                  itemBuilder: (context, index) {
-                    final entry = filtered[index];
-                    return _buildPasswordTile(entry);
-                  },
-                );
+                return _buildMobileList(filtered);
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (err, stack) => Center(child: Text('错误: $err')),
@@ -90,74 +189,665 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const AddPasswordScreen()),
-          );
-        },
-        tooltip: '添加密码',
-        child: const Icon(Icons.add),
+      floatingActionButton: _isSelectionMode
+          ? FilledButton.tonalIcon(
+              onPressed: _deleteSelected,
+              icon: const Icon(Icons.delete, size: 18),
+              label: const Text('删除选中'),
+              style: FilledButton.styleFrom(
+                backgroundColor: theme.colorScheme.errorContainer,
+                foregroundColor: theme.colorScheme.onErrorContainer,
+              ),
+            )
+          : null,
+    );
+  }
+
+  // 桌面端顶部工具栏
+  Widget _buildDesktopToolbar(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: theme.dividerColor.withValues(alpha: 0.1),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Text(
+            '密码',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const Spacer(),
+          // 搜索框
+          SizedBox(
+            width: 300,
+            child: TextField(
+              onChanged: (value) {
+                setState(() => _searchQuery = value);
+              },
+              decoration: InputDecoration(
+                hintText: '搜索密码...',
+                prefixIcon: const Icon(Icons.search),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                filled: true,
+                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // 新增按钮
+          FilledButton.icon(
+            onPressed: () => _toggleRightPanel(),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('新增'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // 全选按钮
+          OutlinedButton.icon(
+            onPressed: _toggleSelectionMode,
+            icon: const Icon(Icons.checklist, size: 18),
+            label: const Text('全选'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // 删除按钮
+          if (_selectedIds.isNotEmpty)
+            FilledButton.tonalIcon(
+              onPressed: _deleteSelected,
+              icon: const Icon(Icons.delete, size: 18),
+              label: const Text('删除'),
+              style: FilledButton.styleFrom(
+                backgroundColor: theme.colorScheme.errorContainer,
+                foregroundColor: theme.colorScheme.onErrorContainer,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+            ),
+        ],
       ),
     );
   }
 
-  Widget _buildGroupFilter() {
-    return SizedBox(
-      height: 60,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  // 右侧面板
+  Widget _buildRightPanel(ThemeData theme) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      width: _isRightPanelOpen ? 450 : 0,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(
+          left: BorderSide(
+            color: theme.dividerColor.withValues(alpha: 0.1),
+            width: 1,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.shadowColor.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(-2, 0),
+          ),
+        ],
+      ),
+      child: _isRightPanelOpen
+          ? Column(
+              children: [
+                // 面板标题栏
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: theme.dividerColor.withValues(alpha: 0.1),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.add,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        '添加密码',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => _toggleRightPanel(),
+                        tooltip: '关闭',
+                      ),
+                    ],
+                  ),
+                ),
+                // 表单内容
+                Expanded(
+                  child: _AddPasswordForm(
+                    onSave: () {
+                      _toggleRightPanel();
+                    },
+                  ),
+                ),
+              ],
+            )
+          : null,
+    );
+  }
+
+  // 切换右侧面板
+  void _toggleRightPanel() {
+    setState(() {
+      _isRightPanelOpen = !_isRightPanelOpen;
+      if (_isRightPanelOpen) {
+        _clearSelection();
+      }
+    });
+  }
+
+  // 移动端选择栏
+  Widget _buildSelectionBar(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+      child: Row(
         children: [
-          FilterChip(
-            label: const Text('全部'),
-            selected: _selectedGroupId == null,
-            onSelected: (selected) {
-              setState(() => _selectedGroupId = selected ? null : _selectedGroupId);
-            },
+          Text(
+            '已选择 ${_selectedIds.length} 项',
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-          const SizedBox(width: 8),
-          FilterChip(
-            label: const Text('个人'),
-            selected: _selectedGroupId == 'personal',
-            onSelected: (selected) {
-              setState(() => _selectedGroupId = selected ? 'personal' : null);
-            },
+          const Spacer(),
+          TextButton(
+            onPressed: _selectAll,
+            child: const Text('全选'),
           ),
-          const SizedBox(width: 8),
-          FilterChip(
-            label: const Text('工作'),
-            selected: _selectedGroupId == 'work',
-            onSelected: (selected) {
-              setState(() => _selectedGroupId = selected ? 'work' : null);
-            },
+          TextButton(
+            onPressed: _clearSelection,
+            child: const Text('取消'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPasswordTile(entry) {
-    return ListTile(
-      leading: CircleAvatar(
-        child: Text(entry.title[0].toUpperCase()),
-      ),
-      title: Text(entry.title),
-      subtitle: Text(entry.username),
-      trailing: IconButton(
-        icon: const Icon(Icons.copy),
-        onPressed: () {
-          // TODO: 复制用户名
+  // 桌面端网格布局
+  Widget _buildDesktopGrid(List<PasswordEntry> entries) {
+    final size = MediaQuery.of(context).size;
+    // 根据屏幕宽度计算每行显示的卡片数量
+    int crossAxisCount = (size.width / 280).floor();
+    if (crossAxisCount < 2) crossAxisCount = 2;
+    if (crossAxisCount > 5) crossAxisCount = 5;
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: GridView.builder(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          childAspectRatio: 1.2,
+        ),
+        itemCount: entries.length,
+        itemBuilder: (context, index) {
+          final entry = entries[index];
+          final isSelected = _selectedIds.contains(entry.id);
+          return _buildPasswordCard(entry, isSelected);
         },
-        tooltip: '复制',
       ),
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PasswordDetailScreen(entry: entry),
-          ),
+    );
+  }
+
+  // 移动端列表布局
+  Widget _buildMobileList(List<PasswordEntry> entries) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: entries.length,
+      itemBuilder: (context, index) {
+        final entry = entries[index];
+        final isSelected = _selectedIds.contains(entry.id);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _buildPasswordCard(entry, isSelected),
         );
       },
+    );
+  }
+
+  // 空状态
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.lock_open_rounded,
+            size: 64,
+            color: theme.colorScheme.outline,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '还没有密码',
+            style: theme.textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '点击 + 添加第一个密码',
+            style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 构建密码卡片
+  Widget _buildPasswordCard(PasswordEntry entry, bool isSelected) {
+    final theme = Theme.of(context);
+
+    return InkWell(
+      onTap: () {
+        if (_isSelectionMode) {
+          _toggleSelection(entry.id);
+        } else {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => PasswordDetailScreen(entry: entry),
+            ),
+          );
+        }
+      },
+      onLongPress: () {
+        if (!_isSelectionMode) {
+          _toggleSelectionMode();
+          _toggleSelection(entry.id);
+        }
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.dividerColor.withValues(alpha: 0.1),
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: theme.shadowColor.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // 选择复选框
+            if (_isSelectionMode)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Checkbox(
+                  value: isSelected,
+                  onChanged: (_) => _toggleSelection(entry.id),
+                ),
+              ),
+            // 类型图标
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Icon(
+                  entry.type.icon,
+                  size: 24,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            // 内容
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          entry.title,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // 类型标签
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          entry.type.label,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSecondaryContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    entry.username,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            // 复制按钮
+            if (!_isSelectionMode)
+              IconButton(
+                icon: const Icon(Icons.copy, size: 20),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('已复制 ${entry.title} 的密码')),
+                  );
+                },
+                tooltip: '复制密码',
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGroupFilter() {
+    // 合并默认分组和自定义分组
+    final allGroups = [..._defaultGroups, ..._customGroups];
+
+    return SizedBox(
+      height: 60,
+      child: Row(
+        children: [
+          // 分组筛选列表
+          Expanded(
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              children: [
+                // "全部"选项
+                FilterChip(
+                  label: const Text('全部'),
+                  selected: _selectedGroupId == null,
+                  onSelected: (selected) {
+                    setState(() => _selectedGroupId = selected ? null : _selectedGroupId);
+                  },
+                ),
+                const SizedBox(width: 8),
+                // 动态生成分组选项
+                ...allGroups.map((groupId) {
+                  String label;
+                  switch (groupId) {
+                    case 'personal':
+                      label = '个人';
+                      break;
+                    case 'work':
+                      label = '工作';
+                      break;
+                    default:
+                      label = groupId; // 自定义分组直接使用名称
+                  }
+
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Text(label),
+                      selected: _selectedGroupId == groupId,
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedGroupId = selected ? groupId : null;
+                        });
+                      },
+                      // 自定义分组可以删除
+                      onDeleted: _customGroups.contains(groupId)
+                          ? () {
+                              _deleteGroup(groupId);
+                            }
+                          : null,
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          // 新增分组按钮
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: OutlinedButton.icon(
+              onPressed: _showAddGroupDialog,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('新增分组'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 显示新增分组对话框
+  void _showAddGroupDialog() {
+    final TextEditingController controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('新增分组'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: '分组名称',
+            hintText: '例如：社交媒体、金融账户等',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (value) {
+            if (value.trim().isNotEmpty) {
+              _addGroup(value.trim());
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final groupName = controller.text.trim();
+              if (groupName.isNotEmpty) {
+                _addGroup(groupName);
+                Navigator.of(context).pop();
+              }
+            },
+            child: const Text('添加'),
+          ),
+        ],
+      ),
+    ).then((_) {
+      controller.dispose();
+    });
+  }
+
+  // 添加新分组
+  void _addGroup(String groupName) {
+    setState(() {
+      if (!_customGroups.contains(groupName) && !_defaultGroups.contains(groupName)) {
+        _customGroups.add(groupName);
+        // 自动选中新创建的分组
+        _selectedGroupId = groupName;
+      }
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已添加分组：$groupName')),
+      );
+    }
+  }
+
+  // 删除分组
+  void _deleteGroup(String groupId) {
+    // 显示确认对话框
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认删除'),
+        content: const Text('删除分组不会删除该分组下的密码条目，确定要删除吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              setState(() {
+                _customGroups.remove(groupId);
+                if (_selectedGroupId == groupId) {
+                  _selectedGroupId = null;
+                }
+              });
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('已删除分组')),
+              );
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 切换选择模式
+  void _toggleSelectionMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedIds.clear();
+      }
+    });
+  }
+
+  // 切换单项选择
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  // 全选
+  void _selectAll() {
+    final entriesAsync = ref.read(entriesByGroupProvider(_selectedGroupId));
+    entriesAsync.whenData((entries) {
+      setState(() {
+        _selectedIds.addAll(entries.map((e) => e.id));
+      });
+    });
+  }
+
+  // 清除选择
+  void _clearSelection() {
+    setState(() {
+      _selectedIds.clear();
+      _isSelectionMode = false;
+    });
+  }
+
+  // 删除选中项
+  void _deleteSelected() {
+    if (_selectedIds.isEmpty) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认删除'),
+        content: Text('确定要删除选中的 ${_selectedIds.length} 个密码吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              for (final id in _selectedIds) {
+                await ref.read(passwordEntriesProvider.notifier).deleteEntry(id);
+              }
+              _clearSelection();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('已删除选中的密码')),
+                );
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -166,6 +856,271 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
       context: context,
       delegate: PasswordSearchDelegate(ref),
     );
+  }
+}
+
+/// 添加密码表单组件
+class _AddPasswordForm extends ConsumerStatefulWidget {
+  final VoidCallback onSave;
+
+  const _AddPasswordForm({required this.onSave});
+
+  @override
+  ConsumerState<_AddPasswordForm> createState() => _AddPasswordFormState();
+}
+
+class _AddPasswordFormState extends ConsumerState<_AddPasswordForm> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _titleController;
+  late final TextEditingController _websiteController;
+  late final TextEditingController _usernameController;
+  late final TextEditingController _passwordController;
+  late final TextEditingController _notesController;
+
+  bool _isLoading = false;
+  bool _obscurePassword = true;
+  PasswordEntryType _selectedType = PasswordEntryType.website; // 默认类型
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController();
+    _websiteController = TextEditingController();
+    _usernameController = TextEditingController();
+    _passwordController = TextEditingController();
+    _notesController = TextEditingController();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 类型选择器
+            DropdownButtonFormField<PasswordEntryType>(
+              initialValue: _selectedType,
+              decoration: const InputDecoration(
+                labelText: '密钥类型',
+                prefixIcon: Icon(Icons.category),
+              ),
+              items: PasswordEntryType.values.map((type) {
+                return DropdownMenuItem(
+                  value: type,
+                  child: Row(
+                    children: [
+                      Icon(type.icon, size: 20),
+                      const SizedBox(width: 12),
+                      Text(type.label),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => _selectedType = value);
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                labelText: '标题',
+                hintText: '例如：Google 账号',
+                prefixIcon: Icon(Icons.title),
+              ),
+              textInputAction: TextInputAction.next,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return '请输入标题';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _websiteController,
+              decoration: const InputDecoration(
+                labelText: '网站',
+                hintText: '例如：https://google.com',
+                prefixIcon: Icon(Icons.language),
+              ),
+              textInputAction: TextInputAction.next,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return '请输入网站';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _usernameController,
+              decoration: const InputDecoration(
+                labelText: '用户名 / 邮箱',
+                prefixIcon: Icon(Icons.person),
+              ),
+              textInputAction: TextInputAction.next,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return '请输入用户名';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _passwordController,
+              obscureText: _obscurePassword,
+              decoration: InputDecoration(
+                labelText: '密码',
+                prefixIcon: const Icon(Icons.lock),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.refresh),
+                      onPressed: _generatePassword,
+                      tooltip: '生成密码',
+                    ),
+                    IconButton(
+                      icon: Icon(_obscurePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off),
+                      onPressed: () {
+                        setState(() => _obscurePassword = !_obscurePassword);
+                      },
+                      tooltip: '显示/隐藏密码',
+                    ),
+                  ],
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return '请输入密码';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _notesController,
+              decoration: const InputDecoration(
+                labelText: '备注（可选）',
+                prefixIcon: Icon(Icons.notes),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 24),
+
+            FilledButton(
+              onPressed: _isLoading ? null : _save,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('保存密码'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final authService = ref.read(authServiceProvider);
+      final masterKey = authService.masterKey;
+
+      if (masterKey == null) {
+        throw Exception('密码库已锁定');
+      }
+
+      // 导入加密服务
+      final encrypted = EncryptionService.encrypt(_passwordController.text, masterKey);
+
+      // 创建密码条目
+      final entry = PasswordEntry(
+        id: const Uuid().v4(),
+        title: _titleController.text,
+        website: _websiteController.text,
+        username: _usernameController.text,
+        encryptedPassword: encrypted,
+        notes: _notesController.text.isEmpty ? null : _notesController.text,
+        groupId: 'default',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        type: _selectedType, // 使用选中的类型
+      );
+
+      await ref.read(passwordEntriesProvider.notifier).addEntry(entry);
+
+      if (!mounted) return;
+
+      widget.onSave();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('密码已保存')),
+      );
+
+      // 清空表单
+      _titleController.clear();
+      _websiteController.clear();
+      _usernameController.clear();
+      _passwordController.clear();
+      _notesController.clear();
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('错误: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _generatePassword() {
+    final password = PasswordGenerator.generate(
+      length: 16,
+      includeUppercase: true,
+      includeLowercase: true,
+      includeNumbers: true,
+      includeSymbols: true,
+    );
+
+    setState(() {
+      _passwordController.text = password;
+    });
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _websiteController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
+    _notesController.dispose();
+    super.dispose();
   }
 }
 

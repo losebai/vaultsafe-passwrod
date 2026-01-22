@@ -1,11 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:vaultsafe/core/sync/sync_auth_type.dart';
 import 'package:vaultsafe/core/sync/sync_config.dart';
 import 'package:vaultsafe/core/sync/sync_interval.dart';
 import 'package:vaultsafe/core/sync/sync_service.dart';
 import 'package:vaultsafe/shared/providers/settings_provider.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
+import 'package:vaultsafe/shared/providers/password_provider.dart';
 
 /// 设置界面
 class SettingsScreen extends ConsumerWidget {
@@ -14,6 +17,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settingsAsync = ref.watch(settingsProvider);
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -21,67 +25,109 @@ class SettingsScreen extends ConsumerWidget {
       ),
       body: settingsAsync.when(
         data: (settings) {
-          return ListView(
+          return Column(
             children: [
-              const _SectionHeader(title: '安全'),
-              SwitchListTile(
-                title: const Text('生物识别解锁'),
-                subtitle: const Text('使用指纹或面部识别解锁'),
-                value: settings.biometricEnabled,
-                onChanged: (value) {
-                  ref.read(settingsProvider.notifier).updateBiometricEnabled(value);
-                },
-              ),
-              ListTile(
-                title: const Text('修改主密码'),
-                leading: const Icon(Icons.lock_reset),
-                onTap: () => _showChangePasswordDialog(context),
-              ),
-              ListTile(
-                title: const Text('自动锁定时间'),
-                subtitle: Text(_formatTimeout(settings.autoLockTimeout)),
-                leading: const Icon(Icons.timer),
-                onTap: () => _showTimeoutDialog(context, ref, settings.autoLockTimeout),
+              // 可滚动的主要内容区域
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  children: [
+                    const _SectionHeader(title: '安全'),
+                    SwitchListTile(
+                      title: const Text('生物识别解锁'),
+                      subtitle: const Text('使用指纹或面部识别解锁'),
+                      value: settings.biometricEnabled,
+                      onChanged: (value) {
+                        ref.read(settingsProvider.notifier).updateBiometricEnabled(value);
+                      },
+                    ),
+                    ListTile(
+                      title: const Text('修改主密码'),
+                      leading: const Icon(Icons.lock_reset),
+                      onTap: () => _showChangePasswordDialog(context),
+                    ),
+                    ListTile(
+                      title: const Text('自动锁定时间'),
+                      subtitle: Text(_formatTimeout(settings.autoLockTimeout)),
+                      leading: const Icon(Icons.timer),
+                      onTap: () => _showTimeoutDialog(context, ref, settings.autoLockTimeout),
+                    ),
+
+                    const _SectionHeader(title: '同步'),
+                    SwitchListTile(
+                      title: const Text('启用同步'),
+                      subtitle: const Text('在设备间同步加密数据'),
+                      value: settings.syncEnabled,
+                      onChanged: (value) {
+                        ref.read(settingsProvider.notifier).updateSyncEnabled(value);
+                        if (value) {
+                          _showSyncSettingsDialog(context);
+                        }
+                      },
+                    ),
+                    ListTile(
+                      title: const Text('同步配置'),
+                      subtitle: Text(settings.syncConfig?.endpointUrl ?? '未配置'),
+                      leading: const Icon(Icons.cloud_sync),
+                      onTap: () => _showSyncSettingsDialog(context),
+                    ),
+
+                    const _SectionHeader(title: '数据'),
+                    ListTile(
+                      title: const Text('数据存储目录'),
+                      subtitle: Text(
+                        settings.dataDirectory,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      leading: const Icon(Icons.folder),
+                      onTap: () => _showStorageDirectoryDialog(context, ref, settings.dataDirectory),
+                    ),
+                    ListTile(
+                      title: const Text('导出备份'),
+                      subtitle: const Text('下载加密备份文件'),
+                      leading: const Icon(Icons.download),
+                      onTap: () => _exportBackup(context, ref),
+                    ),
+                    ListTile(
+                      title: const Text('导入备份'),
+                      subtitle: const Text('从加密备份文件恢复'),
+                      leading: const Icon(Icons.upload),
+                      onTap: () => _importBackup(context, ref),
+                    ),
+                  ],
+                ),
               ),
 
-              const _SectionHeader(title: '同步'),
-              SwitchListTile(
-                title: const Text('启用同步'),
-                subtitle: const Text('在设备间同步加密数据'),
-                value: settings.syncEnabled,
-                onChanged: (value) {
-                  ref.read(settingsProvider.notifier).updateSyncEnabled(value);
-                  if (value) {
-                    _showSyncSettingsDialog(context);
-                  }
-                },
-              ),
-              ListTile(
-                title: const Text('同步配置'),
-                subtitle: Text(settings.syncConfig?.endpointUrl ?? '未配置'),
-                leading: const Icon(Icons.cloud_sync),
-                onTap: () => _showSyncSettingsDialog(context),
-              ),
-
-              const _SectionHeader(title: '数据'),
-              ListTile(
-                title: const Text('导出备份'),
-                subtitle: const Text('下载加密备份文件'),
-                leading: const Icon(Icons.download),
-                onTap: () => _exportBackup(context, ref),
-              ),
-              ListTile(
-                title: const Text('导入备份'),
-                subtitle: const Text('从加密备份文件恢复'),
-                leading: const Icon(Icons.upload),
-                onTap: () => _importBackup(context, ref),
-              ),
-
-              const _SectionHeader(title: '关于'),
-              ListTile(
-                title: const Text('版本'),
-                subtitle: const Text('1.0.0'),
-                leading: const Icon(Icons.info),
+              // 底部版本信息卡片
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: theme.dividerColor.withValues(alpha: 0.1),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'VaultSafe v1.0.0',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           );
@@ -120,6 +166,14 @@ class SettingsScreen extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => const SyncSettingsDialog(),
+    );
+  }
+
+  // 显示存储目录设置弹窗
+  void _showStorageDirectoryDialog(BuildContext context, WidgetRef ref, String currentDirectory) {
+    showDialog(
+      context: context,
+      builder: (context) => StorageDirectoryDialog(currentDirectory: currentDirectory),
     );
   }
 
@@ -979,6 +1033,246 @@ class _SyncSettingsDialogState extends ConsumerState<SyncSettingsDialog> {
     _tokenController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
+    super.dispose();
+  }
+}
+
+/// 存储目录设置弹窗
+class StorageDirectoryDialog extends ConsumerStatefulWidget {
+  final String currentDirectory;
+
+  const StorageDirectoryDialog({super.key, required this.currentDirectory});
+
+  @override
+  ConsumerState<StorageDirectoryDialog> createState() => _StorageDirectoryDialogState();
+}
+
+class _StorageDirectoryDialogState extends ConsumerState<StorageDirectoryDialog> {
+  late TextEditingController _directoryController;
+  bool _isChanging = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _directoryController = TextEditingController(text: widget.currentDirectory);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 600),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 标题
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.folder,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '数据存储目录',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            const Text(
+              '更改存储目录会将所有现有数据迁移到新位置。请确保选择的目录有足够的磁盘空间。',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+
+            // 当前目录显示
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '当前目录',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SelectableText(
+                    widget.currentDirectory,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // 新目录输入
+            TextFormField(
+              controller: _directoryController,
+              decoration: const InputDecoration(
+                labelText: '新存储目录',
+                hintText: 'C:\\Users\\YourName\\VaultSafeData',
+                prefixIcon: Icon(Icons.folder_open),
+                helperText: '请输入绝对路径，留空则使用默认目录',
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 24),
+
+            // 按钮
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('取消'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _isChanging ? null : _changeDirectory,
+                    child: _isChanging
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('更改目录'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _changeDirectory() async {
+    final newDirectory = _directoryController.text.trim();
+
+    if (newDirectory.isEmpty) {
+      // 使用默认目录
+      final appDocDir = await getApplicationDocumentsDirectory();
+      final defaultPath = '${appDocDir.path}${Platform.pathSeparator}vault_safe_data';
+
+      setState(() => _isChanging = true);
+
+      try {
+        final storageService = ref.read(storageServiceProvider);
+        await storageService.changeDataDirectory(defaultPath);
+
+        if (!mounted) return;
+
+        await ref.read(settingsProvider.notifier).updateDataDirectory(defaultPath);
+
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('存储目录已更改为默认位置')),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('更改失败: $e')),
+        );
+      } finally {
+        if (mounted) {
+          setState(() => _isChanging = false);
+        }
+      }
+
+      return;
+    }
+
+    // 验证目录路径
+    final dir = Directory(newDirectory);
+
+    setState(() => _isChanging = true);
+
+    try {
+      // 如果目录不存在，尝试创建
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+
+      // 测试写入权限
+      final testFile = File('${dir.path}${Platform.pathSeparator}.write_test');
+      await testFile.writeAsString('test');
+      await testFile.delete();
+
+      // 更改存储目录
+      final storageService = ref.read(storageServiceProvider);
+      await storageService.changeDataDirectory(newDirectory);
+
+      if (!mounted) return;
+
+      // 更新设置
+      await ref.read(settingsProvider.notifier).updateDataDirectory(newDirectory);
+
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('存储目录已更改，数据已迁移')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('更改失败: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isChanging = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _directoryController.dispose();
     super.dispose();
   }
 }

@@ -1,4 +1,5 @@
 import 'package:vaultsafe/core/encryption/encryption_service.dart';
+import 'package:vaultsafe/shared/models/password_entry_type.dart';
 
 /// Password entry model
 class PasswordEntry {
@@ -12,6 +13,7 @@ class PasswordEntry {
   final DateTime createdAt;
   final DateTime updatedAt;
   final Map<String, String>? customFields;
+  final PasswordEntryType type; // 密码类型
 
   PasswordEntry({
     required this.id,
@@ -24,6 +26,7 @@ class PasswordEntry {
     required this.createdAt,
     required this.updatedAt,
     this.customFields,
+    this.type = PasswordEntryType.website, // 默认为网站类型
   });
 
   PasswordEntry copyWith({
@@ -37,6 +40,7 @@ class PasswordEntry {
     DateTime? createdAt,
     DateTime? updatedAt,
     Map<String, String>? customFields,
+    PasswordEntryType? type,
   }) {
     return PasswordEntry(
       id: id ?? this.id,
@@ -49,6 +53,7 @@ class PasswordEntry {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       customFields: customFields ?? this.customFields,
+      type: type ?? this.type,
     );
   }
 
@@ -64,6 +69,7 @@ class PasswordEntry {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'customFields': customFields,
+      'type': type.value, // 添加类型字段
     };
   }
 
@@ -79,6 +85,9 @@ class PasswordEntry {
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       customFields: json['customFields'] as Map<String, String>?,
+      type: json['type'] != null
+          ? PasswordEntryType.fromValue(json['type'] as String)
+          : PasswordEntryType.website, // 默认为网站类型
     );
   }
 }
