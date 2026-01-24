@@ -1,19 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 import 'package:vaultsafe/core/storage/storage_service.dart';
 import 'package:vaultsafe/features/auth/auth_service.dart';
 import 'package:vaultsafe/features/auth/auth_screen.dart';
 import 'package:vaultsafe/shared/providers/password_provider.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
 
+/// 从安全存储获取数据目录
+/// 如果没有设置，返回 null（将使用默认目录）
+Future<String?> _getDataDirectory() async {
+  const storage = FlutterSecureStorage();
+  return await storage.read(key: 'data_directory');
+}
+
 void main() async {
   // 确保 Flutter 的 Widgets 绑定在使用任何依赖于它的功能之前已被正确初始化
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 初始化本地存储服务（先初始化存储以获取设置）
+  // 先读取数据目录设置
+  String? dataDirectory = await _getDataDirectory();
+
+  // 如果没有设置目录，使用默认目录
+  if (dataDirectory == null || dataDirectory.isEmpty) {
+    final appDocDir = await getApplicationDocumentsDirectory();
+    dataDirectory = path.join(appDocDir.path, 'vault_safe_data');
+    // 保存默认目录到安全存储
+    const storage = FlutterSecureStorage();
+    await storage.write(key: 'data_directory', value: dataDirectory);
+  }
+
+  // 使用正确的目录初始化本地存储服务
   final storageService = StorageService();
-  await storageService.init();
+  await storageService.init(customDirectory: dataDirectory);
 
   // 初始化认证服务
   final authService = await AuthService.initialize();
@@ -45,18 +67,20 @@ class VaultSafeApp extends StatelessWidget {
     return MaterialApp(
       title: 'VaultSafe',
       debugShowCheckedModeBanner: false,
+      // 亮色 
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF2196F3),
           brightness: Brightness.light,
         ).copyWith(
+          // 覆盖之前的颜色
           surface: const Color(0xFFFAFBFC),
           surfaceContainer: const Color(0xFFF5F7FA),
           surfaceContainerHighest: const Color(0xFFEFF2F6),
         ),
-        useMaterial3: true,
+        useMaterial3: true, // 启用 Material Design 3
         fontFamily: 'Roboto',
-        // 全局圆角
+        // 全局卡片样式
         cardTheme: const CardThemeData(
           elevation: 0,
           shape: RoundedRectangleBorder(

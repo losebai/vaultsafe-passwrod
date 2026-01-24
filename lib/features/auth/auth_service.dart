@@ -47,7 +47,7 @@ class AuthService {
   }
 
 
-  /// Check if user has set up master password
+  /// 检查用户是否已设置主密码
   Future<bool> hasMasterPassword() async {
     final salt = await _secureStorage.read(key: 'master_salt');
     final verifier = await _secureStorage.read(key: 'password_verifier');
@@ -59,7 +59,7 @@ class AuthService {
     final salt = EncryptionService.generateSalt();
     final key = EncryptionService.deriveKey(password, salt);
 
-    // Create a verifier to check password validity without storing the actual password
+    // 创建一个验证器来检查密码的有效性，而不存储实际密码。
     final verifier = EncryptionService.encrypt('vaultsafe_verify', key);
 
     await _secureStorage.write(
@@ -76,19 +76,22 @@ class AuthService {
     _salt = salt;
   }
 
-  /// Verify master password and unlock the vault
+  /// 校验主密码
   Future<bool> verifyMasterPassword(String password) async {
     try {
+      // 读取盐
       final saltHex = await _secureStorage.read(key: 'master_salt');
       if (saltHex == null) return false;
 
+      // 密钥
       final salt = Uint8List.fromList(
         List.generate(saltHex.length ~/ 2, (i) => int.parse(saltHex.substring(i * 2, i * 2 + 2), radix: 16)),
       );
 
+      //  用密码 + salt 派生加密密钥
       final key = EncryptionService.deriveKey(password, salt);
 
-      // Verify by trying to decrypt the verifier
+      // 读取加密的验证器（verifier）
       final verifierJson = await _secureStorage.read(key: 'password_verifier');
       if (verifierJson == null) return false;
 
@@ -119,14 +122,14 @@ class AuthService {
     return true;
   }
 
-  /// Check if biometric authentication is available
+  /// 检查是否可用生物识别认证
   Future<bool> isBiometricAvailable() async {
     final isAvailable = await _localAuth.canCheckBiometrics;
     final isDeviceSupported = await _localAuth.isDeviceSupported();
     return isAvailable && isDeviceSupported;
   }
 
-  /// Authenticate with biometrics
+  /// 使用生物识别技术进行身份验证
   Future<bool> authenticateWithBiometrics() async {
     try {
       final isAuthenticated = await _localAuth.authenticate(

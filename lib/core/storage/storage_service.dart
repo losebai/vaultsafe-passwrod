@@ -2,6 +2,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:vaultsafe/shared/models/password_entry.dart';
 import 'package:vaultsafe/shared/models/password_group.dart';
 import 'package:vaultsafe/core/encryption/encryption_service.dart';
@@ -13,9 +14,9 @@ class StorageService {
   static const String _settingsBoxName = 'settings';
   static const String _defaultDataDir = 'vault_safe_data';
 
-  late Box<dynamic> _passwordsBox;
-  late Box<dynamic> _groupsBox;
-  late Box<dynamic> _settingsBox;
+  Box<dynamic>? _passwordsBox;
+  Box<dynamic>? _groupsBox;
+  Box<dynamic>? _settingsBox;
 
   bool _initialized = false;
   String? _currentDirectory;
@@ -23,70 +24,100 @@ class StorageService {
   /// 获取当前数据目录
   String? get currentDirectory => _currentDirectory;
 
+  /// 是否已初始化
+  bool get isInitialized => _initialized;
+
   /// 使用自定义目录路径初始化
   Future<void> init({String? customDirectory}) async {
-    if (_initialized) return;
-
-    String dataPath;
-
-    if (customDirectory != null && customDirectory.isNotEmpty) {
-      // 使用自定义目录
-      dataPath = customDirectory;
-    } else {
-      // 使用默认目录
-      final appDocDir = await getApplicationDocumentsDirectory();
-      dataPath = path.join(appDocDir.path, _defaultDataDir);
+    if (_initialized) {
+      debugPrint('StorageService: 已经初始化，跳过');
+      return;
     }
 
-    // 确保目录存在
-    final dir = Directory(dataPath);
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
+    try {
+      String dataPath;
+
+      if (customDirectory != null && customDirectory.isNotEmpty) {
+        // 使用自定义目录
+        dataPath = customDirectory;
+        debugPrint('StorageService: 使用自定义目录: $dataPath');
+      } else {
+        // 使用默认目录
+        final appDocDir = await getApplicationDocumentsDirectory();
+        dataPath = path.join(appDocDir.path, _defaultDataDir);
+        debugPrint('StorageService: 使用默认目录: $dataPath');
+      }
+
+      // 确保目录存在
+      final dir = Directory(dataPath);
+      if (!await dir.exists()) {
+        debugPrint('StorageService: 创建数据目录: $dataPath');
+        await dir.create(recursive: true);
+      }
+
+      // 验证目录是否可写
+      final testFile = File(path.join(dataPath, '.write_test'));
+      try {
+        await testFile.writeAsString('test');
+        await testFile.delete();
+        debugPrint('StorageService: 目录可写验证成功');
+      } catch (e) {
+        debugPrint('StorageService: 目录不可写! $e');
+        rethrow;
+      }
+
+      _currentDirectory = dataPath;
+
+      // 使用数据路径初始化 Hive
+      debugPrint('StorageService: 初始化 Hive...');
+      await Hive.initFlutter(dataPath);
+
+      // 检测并注册 TypeAdapter<EncryptedData>
+      if (!Hive.isAdapterRegistered(0)) {
+        debugPrint('StorageService: 注册 EncryptedDataAdapter');
+        Hive.registerAdapter(EncryptedDataAdapter());
+      }
+
+      // 打开数据表
+      debugPrint('StorageService: 打开 boxes...');
+      _passwordsBox = await Hive.openBox(_passwordsBoxName);
+      _groupsBox = await Hive.openBox(_groupsBoxName);
+      _settingsBox = await Hive.openBox(_settingsBoxName);
+
+      _initialized = true;
+      debugPrint('StorageService: 初始化完成! 数据路径: $dataPath');
+      debugPrint('StorageService: 密码数量: ${_passwordsBox?.length}, 分组数量: ${_groupsBox?.length}');
+    } catch (e, stackTrace) {
+      debugPrint('StorageService: 初始化失败! $e');
+      debugPrint('StorageService: 堆栈: $stackTrace');
+      rethrow;
     }
-
-    _currentDirectory = dataPath;
-
-    // 使用数据路径初始化 Hive
-    await Hive.initFlutter(dataPath);
-
-    // 检测并注册 TypeAdapter<EncryptedData>
-    if (!Hive.isAdapterRegistered(0)) {
-      Hive.registerAdapter(EncryptedDataAdapter());
-    }
-
-    // 打开数据表
-    _passwordsBox = await Hive.openBox(_passwordsBoxName);
-    _groupsBox = await Hive.openBox(_groupsBoxName);
-    _settingsBox = await Hive.openBox(_settingsBoxName);
-
-    _initialized = true;
   }
 
   /// 确保已初始化
   void _ensureInitialized() {
-    if (!_initialized) {
+    if (!_initialized || _passwordsBox == null || _groupsBox == null || _settingsBox == null) {
       throw Exception('StorageService not initialized. Call init() first.');
     }
   }
-
 
   /// 获取所有密码条目
   Future<List<PasswordEntry>> getPasswordEntries() async {
     _ensureInitialized();
 
     final entries = <PasswordEntry>[];
-    for (final key in _passwordsBox.keys) {
-      final json = _passwordsBox.get(key) as Map<dynamic, dynamic>;
-      if (json != null) {
-        try {
-          final entry = PasswordEntry.fromJson(
-            Map<String, dynamic>.from(json),
-          );
-          entries.add(entry);
-        } catch (e) {
-          // 跳过无效条目
-          continue;
-        }
+    for (final key in _passwordsBox!.keys) {
+      final json = _passwordsBox!.get(key) as Map<dynamic, dynamic>?;
+      if (json == null) continue;
+
+      try {
+        final entry = PasswordEntry.fromJson(
+          Map<String, dynamic>.from(json),
+        );
+        entries.add(entry);
+      } catch (e) {
+        // 跳过无效条目
+        continue;
       }
     }
     return entries;
@@ -96,7 +127,7 @@ class StorageService {
   Future<PasswordEntry?> getPasswordEntry(String id) async {
     _ensureInitialized();
 
-    final json = _passwordsBox.get(id) as Map<dynamic, dynamic>?;
+    final json = _passwordsBox!.get(id) as Map<dynamic, dynamic>?;
     if (json == null) return null;
 
     try {
@@ -110,21 +141,21 @@ class StorageService {
   Future<void> savePasswordEntry(PasswordEntry entry) async {
     _ensureInitialized();
 
-    await _passwordsBox.put(entry.id, entry.toJson());
+    await _passwordsBox!.put(entry.id, entry.toJson());
   }
 
   /// 删除密码条目
   Future<void> deletePasswordEntry(String id) async {
     _ensureInitialized();
 
-    await _passwordsBox.delete(id);
+    await _passwordsBox!.delete(id);
   }
 
   /// 删除所有密码条目
   Future<void> clearPasswordEntries() async {
     _ensureInitialized();
 
-    await _passwordsBox.clear();
+    await _passwordsBox!.clear();
   }
 
   // ===== 分组 =====
@@ -134,8 +165,8 @@ class StorageService {
     _ensureInitialized();
 
     final groups = <PasswordGroup>[];
-    for (final key in _groupsBox.keys) {
-      final json = _groupsBox.get(key) as Map<dynamic, dynamic>?;
+    for (final key in _groupsBox!.keys) {
+      final json = _groupsBox!.get(key) as Map<dynamic, dynamic>?;
       if (json != null) {
         try {
           final group = PasswordGroup.fromJson(
@@ -155,7 +186,7 @@ class StorageService {
   Future<PasswordGroup?> getGroup(String id) async {
     _ensureInitialized();
 
-    final json = _groupsBox.get(id) as Map<dynamic, dynamic>?;
+    final json = _groupsBox!.get(id) as Map<dynamic, dynamic>?;
     if (json == null) return null;
 
     try {
@@ -169,21 +200,21 @@ class StorageService {
   Future<void> saveGroup(PasswordGroup group) async {
     _ensureInitialized();
 
-    await _groupsBox.put(group.id, group.toJson());
+    await _groupsBox!.put(group.id, group.toJson());
   }
 
   /// 删除分组
   Future<void> deleteGroup(String id) async {
     _ensureInitialized();
 
-    await _groupsBox.delete(id);
+    await _groupsBox!.delete(id);
   }
 
   /// 删除所有分组
   Future<void> clearGroups() async {
     _ensureInitialized();
 
-    await _groupsBox.clear();
+    await _groupsBox!.clear();
   }
 
   // ===== 设置 =====
@@ -192,28 +223,28 @@ class StorageService {
   Future<T?> getSetting<T>(String key) async {
     _ensureInitialized();
 
-    return _settingsBox.get(key) as T?;
+    return _settingsBox!.get(key) as T?;
   }
 
   /// 设置设置值
   Future<void> setSetting<T>(String key, T value) async {
     _ensureInitialized();
 
-    await _settingsBox.put(key, value);
+    await _settingsBox!.put(key, value);
   }
 
   /// 删除设置
   Future<void> deleteSetting(String key) async {
     _ensureInitialized();
 
-    await _settingsBox.delete(key);
+    await _settingsBox!.delete(key);
   }
 
   /// 清除所有设置
   Future<void> clearSettings() async {
     _ensureInitialized();
 
-    await _settingsBox.clear();
+    await _settingsBox!.clear();
   }
 
   // ===== 备份/导出 =====
@@ -281,10 +312,13 @@ class StorageService {
   Future<void> close() async {
     if (!_initialized) return;
 
-    await _passwordsBox.close();
-    await _groupsBox.close();
-    await _settingsBox.close();
+    await _passwordsBox?.close();
+    await _groupsBox?.close();
+    await _settingsBox?.close();
 
+    _passwordsBox = null;
+    _groupsBox = null;
+    _settingsBox = null;
     _initialized = false;
   }
 

@@ -1,8 +1,17 @@
+import 'dart:convert';
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:vaultsafe/features/passwords/passwords_screen.dart';
 import 'package:vaultsafe/features/settings/settings_screen.dart';
-import 'package:vaultsafe/features/profile/profile_screen.dart';
+import 'package:vaultsafe/shared/models/sync_config.dart';
+import 'package:vaultsafe/shared/providers/settings_provider.dart';
+import 'package:vaultsafe/shared/providers/password_provider.dart';
+import 'package:vaultsafe/shared/providers/auth_provider.dart';
+
+import 'package:vaultsafe/components/NavigationMenu.dart';
 
 /// 主界面 - 响应式导航（桌面端侧边栏，移动端底部导航）
 class HomeScreen extends StatefulWidget {
@@ -16,10 +25,9 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   bool _isCollapsed = true;
 
-  final List<Widget> _screens = const [
-    PasswordsScreen(),
-    ProfileScreen(),
-    SettingsScreen(),
+  late final List<Widget> _screens = [
+    const PasswordsScreen(),
+    const SettingsScreen(),
   ];
 
   final List<_NavigationItem> _navItems = const [
@@ -29,9 +37,14 @@ class _HomeScreenState extends State<HomeScreen> {
       label: '密码',
     ),
     _NavigationItem(
-      icon: Icons.person_rounded,
-      selectedIcon: Icons.person_rounded,
-      label: '我的',
+      icon: Icons.history_rounded,
+      selectedIcon: Icons.history_rounded,
+      label: '操作日志',
+    ),
+    _NavigationItem(
+      icon: Icons.sync_rounded,
+      selectedIcon: Icons.sync_rounded,
+      label: '同步',
     ),
     _NavigationItem(
       icon: Icons.settings_rounded,
@@ -89,9 +102,11 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (_selectedIndex) {
       case 0: // 密码
         return _buildPasswordsContent();
-      case 1: // 个人中心
-        return _buildProfileContent(context);
-      case 2: // 设置
+      case 1: // 操作日志
+        return _buildLogsContent(context);
+      case 2: // 同步
+        return _buildSyncContent(context);
+      case 3: // 设置
         return _buildSettingsContent(context);
       default:
         return _screens[_selectedIndex];
@@ -103,12 +118,17 @@ class _HomeScreenState extends State<HomeScreen> {
     return const PasswordsScreen();
   }
 
-  // 构建个人中心内容 - 左侧导航右侧内容布局
-  Widget _buildProfileContent(BuildContext context) {
-    return const _ProfileLayout();
+  // 构建操作日志内容
+  Widget _buildLogsContent(BuildContext context) {
+    return const _LogsLayout();
   }
 
-  // 构建设置内容 - 左侧导航右侧内容布局
+  // 构建同步内容
+  Widget _buildSyncContent(BuildContext context) {
+    return const _SyncLayout();
+  }
+
+  // 构建设置内容 - 简化版
   Widget _buildSettingsContent(BuildContext context) {
     return const _SettingsLayout();
   }
@@ -179,6 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.primary,
+                      fontSize: 25
                     ),
                   ),
                 ],
@@ -252,57 +273,17 @@ class _HomeScreenState extends State<HomeScreen> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    final theme = Theme.of(context);
-
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: _isCollapsed ? 8 : 12,
         vertical: 4,
       ),
-      child: InkWell(
+      child: NavigationMenu(
+        icon: icon,
+        label: label,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          height: 48,
-          decoration: BoxDecoration(
-            color: isSelected
-                ? theme.colorScheme.primaryContainer.withValues(alpha: 0.8)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: _isCollapsed
-              ? Center(
-                  child: Icon(
-                    icon,
-                    size: 24,
-                    color: isSelected
-                        ? theme.colorScheme.onPrimaryContainer
-                        : theme.colorScheme.onSurface,
-                  ),
-                )
-              : Row(
-                  children: [
-                    const SizedBox(width: 12),
-                    Icon(
-                      icon,
-                      size: 24,
-                      color: isSelected
-                          ? theme.colorScheme.onPrimaryContainer
-                          : theme.colorScheme.onSurface,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      label,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: isSelected
-                            ? theme.colorScheme.onPrimaryContainer
-                            : theme.colorScheme.onSurface,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
-        ),
+        isSelected: isSelected,
+        isCollapsed: _isCollapsed,
       ),
     );
   }
@@ -321,199 +302,90 @@ class _NavigationItem {
   });
 }
 
-/// 个人中心布局 - 左侧导航右侧内容
-class _ProfileLayout extends StatefulWidget {
-  const _ProfileLayout();
-
-  @override
-  State<_ProfileLayout> createState() => _ProfileLayoutState();
-}
-
-class _ProfileLayoutState extends State<_ProfileLayout> {
-  String? _selectedSection;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Row(
-      children: [
-        // 左侧导航
-        Container(
-          width: 200,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            border: Border(
-              right: BorderSide(
-                color: theme.dividerColor.withValues(alpha: 0.1),
-                width: 1,
-              ),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '个人中心',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _buildNavButton(
-                icon: Icons.person_outline,
-                label: '账户信息',
-                isSelected: _selectedSection == 'account',
-                onTap: () => setState(() => _selectedSection = 'account'),
-              ),
-              const SizedBox(height: 4),
-              _buildNavButton(
-                icon: Icons.devices_outlined,
-                label: '设备列表',
-                isSelected: _selectedSection == 'devices',
-                onTap: () => setState(() => _selectedSection = 'devices'),
-              ),
-              const SizedBox(height: 4),
-              _buildNavButton(
-                icon: Icons.history_outlined,
-                label: '安全日志',
-                isSelected: _selectedSection == 'logs',
-                onTap: () => setState(() => _selectedSection = 'logs'),
-              ),
-              const SizedBox(height: 4),
-              _buildNavButton(
-                icon: Icons.lock_outline,
-                label: '修改密码',
-                isSelected: _selectedSection == 'password',
-                onTap: () => setState(() => _selectedSection = 'password'),
-              ),
-            ],
-          ),
-        ),
-        // 右侧内容
-        Expanded(
-          child: _selectedSection == null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.person_outline,
-                        size: 64,
-                        color: theme.colorScheme.outline,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        '请选择左侧菜单',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : _buildProfileSectionContent(_selectedSection!),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildNavButton({
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    final theme = Theme.of(context);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.5)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isSelected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: isSelected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProfileSectionContent(String section) {
-    switch (section) {
-      case 'account':
-        return const _ProfileAccountSection();
-      case 'devices':
-        return const _ProfileDevicesSection();
-      case 'logs':
-        return const _ProfileLogsSection();
-      case 'password':
-        return const _ProfilePasswordSection();
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-}
-
-/// 账户信息部分
-class _ProfileAccountSection extends StatelessWidget {
-  const _ProfileAccountSection();
+/// 操作日志布局
+class _LogsLayout extends StatelessWidget {
+  const _LogsLayout();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 标题
           Text(
-            '账户信息',
-            style: theme.textTheme.headlineSmall?.copyWith(
+            '敏感操作日志',
+            style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
+              color: const Color.fromARGB(255, 0, 72, 120),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          Text(
+            '记录所有敏感操作，包括查看、添加、编辑和删除密码',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // 日志列表
           Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: theme.dividerColor.withValues(alpha: 0.1),
+              ),
+            ),
             child: Column(
               children: [
-                ListTile(
-                  title: const Text('用户名'),
-                  subtitle: const Text('admin'),
+                _buildLogItem(
+                  theme,
+                  icon: Icons.visibility_outlined,
+                  title: '查看密码',
+                  description: '查看了 Google 账号的密码',
+                  time: '2 分钟前',
+                  color: const Color.fromARGB(255, 33, 150, 243),
                 ),
-                const Divider(height: 1),
-                ListTile(
-                  title: const Text('邮箱'),
-                  subtitle: const Text('user@example.com'),
+                const Divider(height: 1, indent: 72),
+                _buildLogItem(
+                  theme,
+                  icon: Icons.edit_outlined,
+                  title: '编辑密码',
+                  description: '修改了 GitHub 账号的密码',
+                  time: '15 分钟前',
+                  color: const Color.fromARGB(255, 255, 152, 0),
                 ),
-                const Divider(height: 1),
-                ListTile(
-                  title: const Text('注册时间'),
-                  subtitle: const Text('2024-01-01'),
+                const Divider(height: 1, indent: 72),
+                _buildLogItem(
+                  theme,
+                  icon: Icons.add_circle_outline,
+                  title: '添加密码',
+                  description: '添加了新的密码：Twitter 账号',
+                  time: '1 小时前',
+                  color: const Color.fromARGB(255, 76, 175, 80),
+                ),
+                const Divider(height: 1, indent: 72),
+                _buildLogItem(
+                  theme,
+                  icon: Icons.delete_outline,
+                  title: '删除密码',
+                  description: '删除了旧的测试密码',
+                  time: '昨天 14:30',
+                  color: const Color.fromARGB(255, 244, 67, 54),
+                ),
+                const Divider(height: 1, indent: 72),
+                _buildLogItem(
+                  theme,
+                  icon: Icons.file_download_outlined,
+                  title: '导出备份',
+                  description: '导出了加密备份文件',
+                  time: '昨天 10:15',
+                  color: const Color.fromARGB(255, 156, 39, 176),
                 ),
               ],
             ),
@@ -522,43 +394,57 @@ class _ProfileAccountSection extends StatelessWidget {
       ),
     );
   }
-}
 
-/// 设备列表部分
-class _ProfileDevicesSection extends StatelessWidget {
-  const _ProfileDevicesSection();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildLogItem(
+    ThemeData theme, {
+    required IconData icon,
+    required String title,
+    required String description,
+    required String time,
+    required Color color,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Row(
         children: [
-          Text(
-            '已登录设备',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 24,
             ),
           ),
-          const SizedBox(height: 24),
-          Card(
+          const SizedBox(width: 16),
+          Expanded(
             child: Column(
-              children: List.generate(3, (index) {
-                return Column(
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.computer),
-                      title: Text('设备 ${index + 1}'),
-                      subtitle: Text('上次登录: ${DateTime.now().toString().substring(0, 10)}'),
-                      trailing: const Text('当前设备'),
-                    ),
-                    if (index < 2) const Divider(height: 1),
-                  ],
-                );
-              }),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            time,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -567,242 +453,1072 @@ class _ProfileDevicesSection extends StatelessWidget {
   }
 }
 
-/// 安全日志部分
-class _ProfileLogsSection extends StatelessWidget {
-  const _ProfileLogsSection();
+/// 同步布局
+class _SyncLayout extends StatefulWidget {
+  const _SyncLayout();
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  State<_SyncLayout> createState() => _SyncLayoutState();
+}
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '登录日志',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+class _SyncLayoutState extends State<_SyncLayout> {
+  bool _isSyncing = false;
+  String? _syncError;
+  DateTime? _lastSyncTime;
+
+  Future<void> _performSync() async {
+    setState(() {
+      _isSyncing = true;
+      _syncError = null;
+    });
+
+    try {
+      // TODO: 实现实际的同步逻辑
+      await Future.delayed(const Duration(seconds: 2)); // 模拟同步
+
+      if (mounted) {
+        setState(() {
+          _lastSyncTime = DateTime.now();
+          _isSyncing = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('同步成功')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _syncError = e.toString();
+          _isSyncing = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('同步失败: $e')),
+        );
+      }
+    }
+  }
+
+  void _showSyncConfigDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => const _SyncConfigDialog(),
+    );
+  }
+
+  void _showSyncHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('同步帮助'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '同步协议说明',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'VaultSafe 使用端到端加密同步，您的数据在传输和存储时始终处于加密状态。',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+
+              const Text(
+                'API 接口规范',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+              const SizedBox(height: 8),
+              const Text('上传数据 (POST):', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'POST /api/v1/sync\n'
+                  'Authorization: Bearer <token>\n'
+                  'Content-Type: application/json\n\n'
+                  '{\n'
+                  '  "device_id": "uuid-string",\n'
+                  '  "timestamp": 1705742400,\n'
+                  '  "encrypted_data": "base64(AES-GCM(...))",\n'
+                  '  "version": "1.0"\n'
+                  '}',
+                  style: TextStyle(fontFamily: 'monospace', fontSize: 11),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text('下载数据 (GET):', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'GET /api/v1/sync\n'
+                  'Authorization: Bearer <token>\n\n'
+                  '响应:\n'
+                  '{\n'
+                  '  "device_id": "other-device-id",\n'
+                  '  "timestamp": 1705742500,\n'
+                  '  "encrypted_data": "base64(...)",\n'
+                  '  "version": "1.0"\n'
+                  '}',
+                  style: TextStyle(fontFamily: 'monospace', fontSize: 11),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              const Text(
+                '配置示例',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+              const SizedBox(height: 8),
+              _buildExampleItem(
+                '自建服务器',
+                'https://your-server.com/api/v1/sync',
+                'Bearer Token',
+              ),
+              _buildExampleItem(
+                'WebDAV (Nextcloud)',
+                'https://nextcloud.com/remote.php/dav/files/user/vaultsafe.json',
+                'Basic Auth',
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          Card(
-            child: Column(
-              children: List.generate(5, (index) {
-                return Column(
-                  children: [
-                    ListTile(
-                      leading: Icon(
-                        Icons.check_circle,
-                        color: theme.colorScheme.primary,
-                      ),
-                      title: Text('登录成功'),
-                      subtitle: Text('${DateTime.now().toString().substring(0, 19)} - Windows PC'),
-                    ),
-                    if (index < 4) const Divider(height: 1),
-                  ],
-                );
-              }),
-            ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('关闭'),
           ),
         ],
       ),
     );
   }
-}
 
-/// 修改密码部分
-class _ProfilePasswordSection extends StatelessWidget {
-  const _ProfilePasswordSection();
+  Widget _buildExampleItem(String title, String endpoint, String auth) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 2),
+          Text(
+            '端点: $endpoint',
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          Text(
+            '认证: $auth',
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 标题行，包含帮助按钮
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '同步与备份',
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: const Color.fromARGB(255, 0, 72, 120),
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: _showSyncHelpDialog,
+                icon: const Icon(Icons.help_outline),
+                tooltip: '同步帮助',
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           Text(
-            '修改密码',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
+            '管理数据同步和备份',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
+
           Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: theme.dividerColor.withValues(alpha: 0.1),
+              ),
+            ),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(
-                    decoration: const InputDecoration(
-                      labelText: '当前密码',
-                      prefixIcon: Icon(Icons.lock_outline),
-                    ),
-                    obscureText: true,
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color.fromARGB(255, 0, 72, 120).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.cloud_sync_outlined,
+                          color: Color.fromARGB(255, 0, 72, 120),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '同步配置',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _syncError ?? '未配置同步服务器',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: _syncError != null
+                                    ? theme.colorScheme.error
+                                    : theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      FilledButton.tonalIcon(
+                        onPressed: _showSyncConfigDialog,
+                        icon: const Icon(Icons.settings, size: 18),
+                        label: const Text('配置'),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    decoration: const InputDecoration(
-                      labelText: '新密码',
-                      prefixIcon: Icon(Icons.lock),
-                    ),
-                    obscureText: true,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    decoration: const InputDecoration(
-                      labelText: '确认新密码',
-                      prefixIcon: Icon(Icons.lock_clock),
-                    ),
-                    obscureText: true,
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: () {},
-                    child: const Text('修改密码'),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Icon(
+                        _lastSyncTime != null ? Icons.cloud_done : Icons.cloud_off,
+                        size: 20,
+                        color: _lastSyncTime != null
+                            ? const Color.fromARGB(255, 76, 175, 80)
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        _lastSyncTime != null
+                            ? '上次同步: ${_formatDateTime(_lastSyncTime!)}'
+                            : '未同步',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const Spacer(),
+                      FilledButton.icon(
+                        onPressed: _isSyncing ? null : _performSync,
+                        icon: _isSyncing
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.sync, size: 18),
+                        label: Text(_isSyncing ? '同步中...' : '立即同步'),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ),
+
+          const SizedBox(height: 24),
+
+          // 导入导出
+          _buildSettingsCard(
+            theme,
+            title: '导入导出',
+            icon: Icons.swap_vert_outlined,
+            items: [
+              _SettingsItem(
+                icon: Icons.download_outlined,
+                title: '导出备份',
+                description: '下载加密备份文件',
+                onTap: () {
+                  _showExportDialog();
+                },
+              ),
+              _SettingsItem(
+                icon: Icons.upload_outlined,
+                title: '导入备份',
+                description: '从备份文件恢复数据',
+                onTap: () {
+                  _showImportDialog();
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    return '${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} '
+           '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
+  void _showExportDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('导出备份'),
+        content: const Text('是否导出当前所有密码的加密备份？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // TODO: 实现导出逻辑
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('导出功能开发中...')),
+              );
+            },
+            child: const Text('导出'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showImportDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('导入备份'),
+        content: const Text('从备份文件恢复数据将覆盖现有数据，是否继续？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // TODO: 实现导入逻辑
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('导入功能开发中...')),
+              );
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('导入'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsCard(
+    ThemeData theme, {
+    required String title,
+    required IconData icon,
+    required List<_SettingsItem> items,
+  }) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: theme.dividerColor.withValues(alpha: 0.1),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color.fromARGB(255, 0, 72, 120).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: const Color.fromARGB(255, 0, 72, 120),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...items.map((item) => Column(
+                children: [
+                  InkWell(
+                    onTap: item.onTap,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      child: Row(
+                        children: [
+                          Icon(
+                            item.icon,
+                            size: 20,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.title,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  item.description,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (item.trailing != null)
+                            item.trailing!
+                          else
+                            Icon(
+                              Icons.chevron_right,
+                              size: 20,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (item != items.last) const Divider(height: 1, indent: 56),
+                ],
+              )),
+          const SizedBox(height: 8),
         ],
       ),
     );
   }
 }
 
-/// 设置布局 - 左侧导航右侧内容
-class _SettingsLayout extends StatefulWidget {
-  const _SettingsLayout();
+/// 同步配置对话框
+class _SyncConfigDialog extends StatefulWidget {
+  const _SyncConfigDialog();
 
   @override
-  State<_SettingsLayout> createState() => _SettingsLayoutState();
+  State<_SyncConfigDialog> createState() => _SyncConfigDialogState();
 }
 
-class _SettingsLayoutState extends State<_SettingsLayout> {
-  String? _selectedSection;
+class _SyncConfigDialogState extends State<_SyncConfigDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _endpointController;
+  late final TextEditingController _tokenController;
+  late final TextEditingController _usernameController;
+  late final TextEditingController _passwordController;
+
+  SyncAuthType _authType = SyncAuthType.bearer;
+  SyncInterval _interval = SyncInterval.none;
+  bool _isEnabled = false;
+  bool _isTesting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _endpointController = TextEditingController();
+    _tokenController = TextEditingController();
+    _usernameController = TextEditingController();
+    _passwordController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _endpointController.dispose();
+    _tokenController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _testConnection() async {
+    if (_endpointController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先输入同步端点')),
+      );
+      return;
+    }
+
+    setState(() => _isTesting = true);
+
+    try {
+      final dio = Dio();
+      await dio.get(
+        _endpointController.text,
+        options: Options(
+          headers: _buildTestHeaders(),
+        ),
+      );
+
+      if (mounted) {
+        setState(() => _isTesting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('连接测试成功！'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isTesting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('连接测试失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Map<String, String> _buildTestHeaders() {
+    switch (_authType) {
+      case SyncAuthType.bearer:
+        if (_tokenController.text.isNotEmpty) {
+          return {'Authorization': 'Bearer ${_tokenController.text}'};
+        }
+        break;
+      case SyncAuthType.basic:
+        if (_usernameController.text.isNotEmpty && _passwordController.text.isNotEmpty) {
+          final credentials = base64.encode(
+            utf8.encode('${_usernameController.text}:${_passwordController.text}'),
+          );
+          return {'Authorization': 'Basic $credentials'};
+        }
+        break;
+      case SyncAuthType.custom:
+        // Custom headers would be built here
+        break;
+    }
+    return {};
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Row(
-      children: [
-        // 左侧导航
-        Container(
-          width: 200,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            border: Border(
-              right: BorderSide(
-                color: theme.dividerColor.withValues(alpha: 0.1),
-                width: 1,
-              ),
-            ),
-          ),
+    return AlertDialog(
+      title: const Text('配置同步'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                '设置',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+              // 启用同步
+              SwitchListTile(
+                title: const Text('启用云同步'),
+                subtitle: const Text('在设备间同步加密数据'),
+                value: _isEnabled,
+                onChanged: (value) {
+                  setState(() => _isEnabled = value);
+                },
               ),
               const SizedBox(height: 16),
-              _buildNavButton(
-                icon: Icons.security_outlined,
-                label: '安全',
-                isSelected: _selectedSection == 'security',
-                onTap: () => setState(() => _selectedSection = 'security'),
+
+              // 同步端点
+              TextFormField(
+                controller: _endpointController,
+                decoration: const InputDecoration(
+                  labelText: '同步端点',
+                  hintText: 'https://your-server.com/api/v1/sync',
+                  prefixIcon: Icon(Icons.http),
+                ),
+                enabled: _isEnabled,
               ),
-              const SizedBox(height: 4),
-              _buildNavButton(
-                icon: Icons.sync_outlined,
-                label: '同步',
-                isSelected: _selectedSection == 'sync',
-                onTap: () => setState(() => _selectedSection = 'sync'),
+              const SizedBox(height: 16),
+
+              // 认证方式
+              DropdownButtonFormField<SyncAuthType>(
+                initialValue: _authType,
+                decoration: const InputDecoration(
+                  labelText: '认证方式',
+                  prefixIcon: Icon(Icons.lock_outline),
+                ),
+                items: SyncAuthType.values.map((type) {
+                  return DropdownMenuItem(
+                    value: type,
+                    child: Text(type.label),
+                  );
+                }).toList(),
+                onChanged: _isEnabled ? (value) {
+                  setState(() => _authType = value!);
+                } : null,
               ),
-              const SizedBox(height: 4),
-              _buildNavButton(
-                icon: Icons.storage_outlined,
-                label: '数据',
-                isSelected: _selectedSection == 'data',
-                onTap: () => setState(() => _selectedSection = 'data'),
+              const SizedBox(height: 16),
+
+              // 根据认证类型显示不同字段
+              if (_authType == SyncAuthType.bearer) ...[
+                TextFormField(
+                  controller: _tokenController,
+                  decoration: const InputDecoration(
+                    labelText: 'Bearer Token',
+                    prefixIcon: Icon(Icons.vpn_key),
+                  ),
+                  enabled: _isEnabled,
+                ),
+              ] else if (_authType == SyncAuthType.basic) ...[
+                TextFormField(
+                  controller: _usernameController,
+                  decoration: const InputDecoration(
+                    labelText: '用户名',
+                    prefixIcon: Icon(Icons.person),
+                  ),
+                  enabled: _isEnabled,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _passwordController,
+                  decoration: const InputDecoration(
+                    labelText: '密码',
+                    prefixIcon: Icon(Icons.lock),
+                  ),
+                  obscureText: true,
+                  enabled: _isEnabled,
+                ),
+              ],
+
+              const SizedBox(height: 16),
+
+              // 同步间隔
+              DropdownButtonFormField<SyncInterval>(
+                initialValue: _interval,
+                decoration: const InputDecoration(
+                  labelText: '自动同步间隔',
+                  prefixIcon: Icon(Icons.schedule),
+                ),
+                items: SyncInterval.values.map((interval) {
+                  return DropdownMenuItem(
+                    value: interval,
+                    child: Text(interval.label),
+                  );
+                }).toList(),
+                onChanged: _isEnabled ? (value) {
+                  setState(() => _interval = value!);
+                } : null,
               ),
             ],
           ),
         ),
-        // 右侧内容
-        Expanded(
-          child: _selectedSection == null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.settings_outlined,
-                        size: 64,
-                        color: theme.colorScheme.outline,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        '请选择左侧菜单',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        OutlinedButton.icon(
+          onPressed: _isTesting ? null : _testConnection,
+          icon: _isTesting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : _buildSettingsSectionContent(_selectedSection!),
+              : const Icon(Icons.wifi_find, size: 18),
+          label: const Text('测试连接'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (_formKey.currentState?.validate() ?? false) {
+              // TODO: 保存配置
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('配置已保存')),
+              );
+            }
+          },
+          child: const Text('保存'),
         ),
       ],
     );
   }
+}
 
-  Widget _buildNavButton({
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
+class _SettingsItem {
+  final IconData icon;
+  final String title;
+  final String description;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+
+  const _SettingsItem({
+    required this.icon,
+    required this.title,
+    required this.description,
+    this.onTap,
+    this.trailing,
+  });
+}
+
+/// 设置布局 - 简洁版
+class _SettingsLayout extends ConsumerWidget {
+  const _SettingsLayout();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final settingsAsync = ref.watch(settingsProvider);
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.5)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isSelected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: isSelected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+    return settingsAsync.when(
+      data: (settings) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 标题
+              Text(
+                '设置',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: const Color.fromARGB(255, 0, 72, 120),
+                ),
               ),
+              const SizedBox(height: 32),
+
+              // 安全设置
+              _buildSettingsCard(
+                theme,
+                title: '安全设置',
+                icon: Icons.security_outlined,
+                items: [
+                  _SettingsItem(
+                    icon: Icons.lock_reset,
+                    title: '修改主密码',
+                    description: '更改您的访问密码',
+                    onTap: () => _showChangePasswordDialog(context),
+                  ),
+                  _SettingsItem(
+                    icon: Icons.timer_outlined,
+                    title: '自动锁定',
+                    description: _formatTimeout(settings.autoLockTimeout),
+                    onTap: () => _showTimeoutDialog(context, ref, settings.autoLockTimeout),
+                    trailing: Text(
+                      _formatTimeout(settings.autoLockTimeout),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              // 数据存储
+              _buildSettingsCard(
+                theme,
+                title: '数据存储',
+                icon: Icons.storage_outlined,
+                items: [
+                  _SettingsItem(
+                    icon: Icons.folder_outlined,
+                    title: '数据存储目录',
+                    description: settings.dataDirectory,
+                    onTap: () => _showDataDirectoryDialog(context, ref, settings.dataDirectory),
+                    trailing: Text(
+                      '更改',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              // 外观设置
+              _buildSettingsCard(
+                theme,
+                title: '外观',
+                icon: Icons.palette_outlined,
+                items: const [
+                  _SettingsItem(
+                    icon: Icons.dark_mode_outlined,
+                    title: '深色模式',
+                    description: '切换深色/浅色主题',
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(child: Text('加载设置失败: $error')),
+    );
+  }
+
+  Widget _buildSettingsCard(
+    ThemeData theme, {
+    required String title,
+    required IconData icon,
+    required List<_SettingsItem> items,
+  }) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: theme.dividerColor.withValues(alpha: 0.1),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color.fromARGB(255, 0, 72, 120).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: const Color.fromARGB(255, 0, 72, 120),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...items.map((item) => Column(
+                children: [
+                  InkWell(
+                    onTap: item.onTap,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      child: Row(
+                        children: [
+                          Icon(
+                            item.icon,
+                            size: 20,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.title,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  item.description,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (item.trailing != null)
+                            item.trailing!
+                          else
+                            Icon(
+                              Icons.chevron_right,
+                              size: 20,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (item != items.last) const Divider(height: 1, indent: 56),
+                ],
+              )),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  void _showDataDirectoryDialog(BuildContext context, WidgetRef ref, String currentDirectory) {
+    final controller = TextEditingController(text: currentDirectory);
+    bool isChanging = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('更改数据存储目录'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('当前目录:'),
+              const SizedBox(height: 4),
+              Text(
+                currentDirectory,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  labelText: '新目录路径',
+                  hintText: '留空使用默认位置',
+                  border: OutlineInputBorder(),
+                ),
+                enabled: !isChanging,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '注意：更改目录将自动迁移所有数据',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isChanging ? null : () => Navigator.of(context).pop(),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: isChanging
+                  ? null
+                  : () async {
+                      final newDirectory = controller.text.trim();
+
+                      setDialogState(() => isChanging = true);
+
+                      try {
+                        // 使用默认目录
+                        if (newDirectory.isEmpty) {
+                          final appDocDir = await getApplicationDocumentsDirectory();
+                          final defaultPath = '${appDocDir.path}${Platform.pathSeparator}vault_safe_data';
+
+                          final storageService = ref.read(storageServiceProvider);
+                          await storageService.changeDataDirectory(defaultPath);
+
+                          if (context.mounted) {
+                            await ref.read(settingsProvider.notifier).updateDataDirectory(defaultPath);
+                            Navigator.of(context).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('存储目录已更改为默认位置')),
+                            );
+                          }
+                          return;
+                        }
+
+                        // 验证目录路径
+                        final dir = Directory(newDirectory);
+
+                        // 如果目录不存在，尝试创建
+                        if (!await dir.exists()) {
+                          await dir.create(recursive: true);
+                        }
+
+                        // 测试写入权限
+                        final testFile = File('${dir.path}${Platform.pathSeparator}.write_test');
+                        await testFile.writeAsString('test');
+                        await testFile.delete();
+
+                        // 更改存储目录
+                        final storageService = ref.read(storageServiceProvider);
+                        await storageService.changeDataDirectory(newDirectory);
+
+                        if (context.mounted) {
+                          // 更新设置
+                          await ref.read(settingsProvider.notifier).updateDataDirectory(newDirectory);
+
+                          Navigator.of(context).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('存储目录已更改，数据已迁移')),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          setDialogState(() => isChanging = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('更改失败: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: const Text('更改'),
             ),
           ],
         ),
@@ -810,172 +1526,243 @@ class _SettingsLayoutState extends State<_SettingsLayout> {
     );
   }
 
-  Widget _buildSettingsSectionContent(String section) {
-    switch (section) {
-      case 'security':
-        return const _SettingsSecuritySection();
-      case 'sync':
-        return const _SettingsSyncSection();
-      case 'data':
-        return const _SettingsDataSection();
-      default:
-        return const SizedBox.shrink();
+  void _showChangePasswordDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const _ChangePasswordDialog(),
+    );
+  }
+
+  void _showTimeoutDialog(BuildContext context, WidgetRef ref, Duration current) {
+    showDialog(
+      context: context,
+      builder: (context) => _TimeoutDialog(current: current),
+    );
+  }
+
+  String _formatTimeout(Duration duration) {
+    if (duration.inSeconds < 60) {
+      return '${duration.inSeconds} 秒';
+    } else if (duration.inMinutes < 60) {
+      return '${duration.inMinutes} 分钟';
+    } else {
+      return '${duration.inHours} 小时';
     }
   }
 }
 
-/// 安全设置部分
-class _SettingsSecuritySection extends StatelessWidget {
-  const _SettingsSecuritySection();
+/// 修改主密码对话框
+class _ChangePasswordDialog extends ConsumerStatefulWidget {
+  const _ChangePasswordDialog();
+
+  @override
+  ConsumerState<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends ConsumerState<_ChangePasswordDialog> {
+  final _currentController = TextEditingController();
+  final _newController = TextEditingController();
+  final _confirmController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  bool _isLoading = false;
+  bool _obscureCurrent = true;
+  bool _obscureNew = true;
+  bool _obscureConfirm = true;
+
+  @override
+  void dispose() {
+    _currentController.dispose();
+    _newController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final authService = ref.read(authServiceProvider);
+
+      // 更改密码 - changeMasterPassword 需要旧密码和新密码
+      final currentPassword = _currentController.text;
+      final newPassword = _newController.text;
+
+      final success = await authService.changeMasterPassword(currentPassword, newPassword);
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+
+        if (success) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('密码已成功更改'), backgroundColor: Colors.green),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('当前密码错误'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('更改失败: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '安全设置',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
+    return AlertDialog(
+      title: const Text('修改主密码'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _currentController,
+              obscureText: _obscureCurrent,
+              decoration: InputDecoration(
+                labelText: '当前密码',
+                prefixIcon: const Icon(Icons.lock),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureCurrent ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () => setState(() => _obscureCurrent = !_obscureCurrent),
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return '请输入当前密码';
+                }
+                return null;
+              },
             ),
-          ),
-          const SizedBox(height: 24),
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.fingerprint_outlined),
-                  title: const Text('生物识别解锁'),
-                  subtitle: const Text('使用指纹或面部识别解锁'),
-                  trailing: Switch(
-                    value: true,
-                    onChanged: (value) {},
-                  ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _newController,
+              obscureText: _obscureNew,
+              decoration: InputDecoration(
+                labelText: '新密码',
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureNew ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () => setState(() => _obscureNew = !_obscureNew),
                 ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.lock_reset),
-                  title: const Text('修改主密码'),
-                  subtitle: const Text('更改您的访问密码'),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.timer_outlined),
-                  title: const Text('自动锁定时间'),
-                  subtitle: const Text('应用自动锁定的时间间隔'),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                ),
-              ],
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return '请输入新密码';
+                }
+                if (value.length < 6) {
+                  return '密码至少6位';
+                }
+                return null;
+              },
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _confirmController,
+              obscureText: _obscureConfirm,
+              decoration: InputDecoration(
+                labelText: '确认新密码',
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return '请确认新密码';
+                }
+                if (value != _newController.text) {
+                  return '两次输入的密码不一致';
+                }
+                return null;
+              },
+            ),
+          ],
+        ),
       ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: _isLoading ? null : _submit,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('确认'),
+        ),
+      ],
     );
   }
 }
 
-/// 同步设置部分
-class _SettingsSyncSection extends StatelessWidget {
-  const _SettingsSyncSection();
+/// 自动锁定时间对话框
+class _TimeoutDialog extends ConsumerWidget {
+  final Duration current;
+
+  const _TimeoutDialog({required this.current});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final timeouts = [
+      const Duration(seconds: 30),
+      const Duration(minutes: 1),
+      const Duration(minutes: 5),
+      const Duration(minutes: 15),
+    ];
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '同步设置',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.cloud_sync_outlined),
-                  title: const Text('启用同步'),
-                  subtitle: const Text('在设备间同步加密数据'),
-                  trailing: Switch(
-                    value: true,
-                    onChanged: (value) {},
-                  ),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.settings_outlined),
-                  title: const Text('同步配置'),
-                  subtitle: const Text('配置同步服务器和认证'),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                ),
-              ],
-            ),
-          ),
-        ],
+    String formatTimeout(Duration duration) {
+      if (duration.inSeconds < 60) {
+        return '${duration.inSeconds} 秒';
+      } else if (duration.inMinutes < 60) {
+        return '${duration.inMinutes} 分钟';
+      } else {
+        return '${duration.inHours} 小时';
+      }
+    }
+
+    return AlertDialog(
+      title: const Text('自动锁定时间'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: timeouts.map((timeout) {
+          final isSelected = timeout == current;
+          return ListTile(
+            title: Text(formatTimeout(timeout)),
+            trailing: isSelected
+                ? Icon(Icons.check, color: theme.colorScheme.primary)
+                : null,
+            onTap: () {
+              ref.read(settingsProvider.notifier).updateAutoLockTimeout(timeout);
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('已设置为 ${formatTimeout(timeout)}')),
+              );
+            },
+          );
+        }).toList(),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+      ],
     );
   }
 }
-
-/// 数据设置部分
-class _SettingsDataSection extends StatelessWidget {
-  const _SettingsDataSection();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '数据管理',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.folder_outlined),
-                  title: const Text('数据存储目录'),
-                  subtitle: const Text('查看或更改数据存储位置'),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.download_outlined),
-                  title: const Text('导出备份'),
-                  subtitle: const Text('下载加密备份文件'),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.upload_outlined),
-                  title: const Text('导入备份'),
-                  subtitle: const Text('从备份文件恢复数据'),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-

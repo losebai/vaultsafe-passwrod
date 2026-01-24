@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:local_auth/local_auth.dart';
-import 'package:vaultsafe/features/auth/auth_service.dart';
 import 'package:vaultsafe/features/auth/setup_password_screen.dart';
 import 'package:vaultsafe/features/home/home_screen.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
+
 
 /// 认证界面 - 处理主密码输入和生物识别
 class AuthScreen extends ConsumerStatefulWidget {
@@ -50,7 +49,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
   }
 
+  // 主密码解锁
   Future<void> _unlock() async {
+    // 1. 触发验证
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
@@ -58,6 +59,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final authService = ref.read(authServiceProvider);
     final success = await authService.verifyMasterPassword(_passwordController.text);
 
+
+    // 是否卸载
     if (!mounted) return;
 
     setState(() => _isLoading = false);
@@ -86,7 +89,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
+            begin: Alignment.topCenter,
             end: Alignment.bottomRight,
             colors: [
               theme.colorScheme.primary.withOpacity(0.05),

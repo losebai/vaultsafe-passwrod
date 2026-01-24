@@ -4,6 +4,8 @@ import 'package:vaultsafe/shared/providers/auth_provider.dart';
 
 /// 设置主密码界面
 class SetupPasswordScreen extends ConsumerStatefulWidget {
+
+  /// 构造函数
   const SetupPasswordScreen({super.key});
 
   @override
@@ -11,8 +13,11 @@ class SetupPasswordScreen extends ConsumerStatefulWidget {
 }
 
 class _SetupPasswordScreenState extends ConsumerState<SetupPasswordScreen> {
+
+  /// 主密码输入框控制器
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
+  /// 表单键
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 

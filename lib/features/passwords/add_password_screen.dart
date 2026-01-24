@@ -71,13 +71,13 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
             TextFormField(
               controller: _websiteController,
               decoration: const InputDecoration(
-                labelText: '网站',
+                labelText: 'HOST',
                 border: OutlineInputBorder(),
                 hintText: '例如：https://google.com',
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return '请输入网站';
+                  return '请输入HOST';
                 }
                 return null;
               },

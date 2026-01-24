@@ -63,7 +63,7 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(5),
         children: [
           // Title card
           Card(
