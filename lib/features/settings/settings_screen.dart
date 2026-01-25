@@ -12,6 +12,7 @@ import 'package:vaultsafe/core/backup/backup_service.dart';
 import 'package:vaultsafe/shared/providers/settings_provider.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
 import 'package:vaultsafe/shared/providers/password_provider.dart';
+import 'package:vaultsafe/features/settings/logs_screen.dart';
 
 /// 设置界面
 class SettingsScreen extends ConsumerWidget {
@@ -97,6 +98,18 @@ class SettingsScreen extends ConsumerWidget {
                       subtitle: const Text('从加密备份文件恢复'),
                       leading: const Icon(Icons.upload),
                       onTap: () => _importBackup(context, ref),
+                    ),
+                    ListTile(
+                      title: const Text('系统日志'),
+                      subtitle: const Text('查看应用程序运行日志'),
+                      leading: const Icon(Icons.bug_report_outlined),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const LogsScreen(),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),

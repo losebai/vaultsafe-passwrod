@@ -39,7 +39,10 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
   @override
   void initState() {
     super.initState();
-    ref.read(passwordEntriesProvider.notifier).loadEntries();
+    // 延迟到第一帧渲染后再加载数据，避免在 widget 树构建期间修改 provider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(passwordEntriesProvider.notifier).loadEntries();
+    });
   }
 
   @override

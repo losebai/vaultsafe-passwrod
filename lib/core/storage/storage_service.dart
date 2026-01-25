@@ -2,10 +2,10 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:vaultsafe/shared/models/password_entry.dart';
 import 'package:vaultsafe/shared/models/password_group.dart';
 import 'package:vaultsafe/core/encryption/encryption_service.dart';
+import 'package:vaultsafe/core/logging/log_service.dart';
 
 /// 使用 Hive 进行本地加密数据持久化的存储服务
 class StorageService {
@@ -30,7 +30,7 @@ class StorageService {
   /// 使用自定义目录路径初始化
   Future<void> init({String? customDirectory}) async {
     if (_initialized) {
-      debugPrint('StorageService: 已经初始化，跳过');
+      log.d('StorageService: 已经初始化，跳过', source: 'StorageService');
       return;
     }
 
@@ -40,18 +40,18 @@ class StorageService {
       if (customDirectory != null && customDirectory.isNotEmpty) {
         // 使用自定义目录
         dataPath = customDirectory;
-        debugPrint('StorageService: 使用自定义目录: $dataPath');
+        log.i('StorageService: 使用自定义目录: $dataPath', source: 'StorageService');
       } else {
         // 使用默认目录
         final appDocDir = await getApplicationDocumentsDirectory();
         dataPath = path.join(appDocDir.path, _defaultDataDir);
-        debugPrint('StorageService: 使用默认目录: $dataPath');
+        log.i('StorageService: 使用默认目录: $dataPath', source: 'StorageService');
       }
 
       // 确保目录存在
       final dir = Directory(dataPath);
       if (!await dir.exists()) {
-        debugPrint('StorageService: 创建数据目录: $dataPath');
+        log.d('StorageService: 创建数据目录: $dataPath', source: 'StorageService');
         await dir.create(recursive: true);
       }
 
@@ -60,36 +60,35 @@ class StorageService {
       try {
         await testFile.writeAsString('test');
         await testFile.delete();
-        debugPrint('StorageService: 目录可写验证成功');
+        log.d('StorageService: 目录可写验证成功', source: 'StorageService');
       } catch (e) {
-        debugPrint('StorageService: 目录不可写! $e');
+        log.e('StorageService: 目录不可写!', source: 'StorageService', error: e);
         rethrow;
       }
 
       _currentDirectory = dataPath;
 
       // 使用数据路径初始化 Hive
-      debugPrint('StorageService: 初始化 Hive...');
+      log.d('StorageService: 初始化 Hive...', source: 'StorageService');
       await Hive.initFlutter(dataPath);
 
       // 检测并注册 TypeAdapter<EncryptedData>
       if (!Hive.isAdapterRegistered(0)) {
-        debugPrint('StorageService: 注册 EncryptedDataAdapter');
+        log.d('StorageService: 注册 EncryptedDataAdapter', source: 'StorageService');
         Hive.registerAdapter(EncryptedDataAdapter());
       }
 
       // 打开数据表
-      debugPrint('StorageService: 打开 boxes...');
+      log.d('StorageService: 打开 boxes...', source: 'StorageService');
       _passwordsBox = await Hive.openBox(_passwordsBoxName);
       _groupsBox = await Hive.openBox(_groupsBoxName);
       _settingsBox = await Hive.openBox(_settingsBoxName);
 
       _initialized = true;
-      debugPrint('StorageService: 初始化完成! 数据路径: $dataPath');
-      debugPrint('StorageService: 密码数量: ${_passwordsBox?.length}, 分组数量: ${_groupsBox?.length}');
+      log.i('StorageService: 初始化完成! 数据路径: $dataPath', source: 'StorageService');
+      log.i('StorageService: 密码数量: ${_passwordsBox?.length}, 分组数量: ${_groupsBox?.length}', source: 'StorageService');
     } catch (e, stackTrace) {
-      debugPrint('StorageService: 初始化失败! $e');
-      debugPrint('StorageService: 堆栈: $stackTrace');
+      log.e('StorageService: 初始化失败!', source: 'StorageService', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }

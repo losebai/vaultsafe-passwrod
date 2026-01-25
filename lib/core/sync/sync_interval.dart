@@ -19,4 +19,17 @@ extension SyncIntervalExtension on SyncInterval {
         return const Duration(hours: 1);
     }
   }
+
+  String get label {
+    switch (this) {
+      case SyncInterval.none:
+        return '关闭';
+      case SyncInterval.every5Min:
+        return '每 5 分钟';
+      case SyncInterval.every15Min:
+        return '每 15 分钟';
+      case SyncInterval.hourly:
+        return '每小时';
+    }
+  }
 }

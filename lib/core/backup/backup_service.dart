@@ -7,6 +7,7 @@ import 'package:path/path.dart' as path;
 import 'package:crypto/crypto.dart';
 import 'package:vaultsafe/core/storage/storage_service.dart';
 import 'package:vaultsafe/core/encryption/encryption_service.dart';
+import 'package:vaultsafe/core/logging/log_service.dart';
 import 'package:vaultsafe/shared/models/password_entry.dart';
 
 /// 备份服务 - 处理加密导出/导入功能
@@ -208,7 +209,7 @@ class BackupService {
       }
     } catch (e) {
       // 静默失败，不影响主要功能
-      debugPrint('清理备份文件失败: $e');
+      log.w('清理备份文件失败: $e', source: 'BackupService');
     }
   }
 }
