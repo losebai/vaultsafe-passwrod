@@ -166,6 +166,14 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
                   ),
                 ),
                 ListTile(
+                  leading: Icon(
+                    widget.entry.syncEnabled ? Icons.sync : Icons.sync_disabled,
+                    color: widget.entry.syncEnabled ? Colors.green : Colors.grey,
+                  ),
+                  title: const Text('同步状态'),
+                  subtitle: Text(widget.entry.syncEnabled ? '已启用同步' : '仅本地保存，不同步'),
+                ),
+                ListTile(
                   leading: const Icon(Icons.calendar_today),
                   title: const Text('创建时间'),
                   subtitle: Text(_formatDate(widget.entry.createdAt)),

@@ -14,6 +14,7 @@ class PasswordEntry {
   final DateTime updatedAt;
   final Map<String, String>? customFields;
   final PasswordEntryType type; // 密码类型
+  final bool syncEnabled; // 是否启用同步
 
   PasswordEntry({
     required this.id,
@@ -27,6 +28,7 @@ class PasswordEntry {
     required this.updatedAt,
     this.customFields,
     this.type = PasswordEntryType.website, // 默认为网站类型
+    this.syncEnabled = true, // 默认启用同步
   });
 
   PasswordEntry copyWith({
@@ -41,6 +43,7 @@ class PasswordEntry {
     DateTime? updatedAt,
     Map<String, String>? customFields,
     PasswordEntryType? type,
+    bool? syncEnabled,
   }) {
     return PasswordEntry(
       id: id ?? this.id,
@@ -54,6 +57,7 @@ class PasswordEntry {
       updatedAt: updatedAt ?? this.updatedAt,
       customFields: customFields ?? this.customFields,
       type: type ?? this.type,
+      syncEnabled: syncEnabled ?? this.syncEnabled,
     );
   }
 
@@ -70,6 +74,7 @@ class PasswordEntry {
       'updatedAt': updatedAt.toIso8601String(),
       'customFields': customFields,
       'type': type.value, // 添加类型字段
+      'syncEnabled': syncEnabled, // 添加同步开关字段
     };
   }
 
@@ -88,6 +93,7 @@ class PasswordEntry {
       type: json['type'] != null
           ? PasswordEntryType.fromValue(json['type'] as String)
           : PasswordEntryType.website, // 默认为网站类型
+      syncEnabled: json['syncEnabled'] as bool? ?? true, // 默认启用同步，兼容旧数据
     );
   }
 }

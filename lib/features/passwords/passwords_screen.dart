@@ -7,6 +7,7 @@ import 'package:vaultsafe/shared/providers/password_provider.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
 import 'package:vaultsafe/shared/models/password_entry.dart';
 import 'package:vaultsafe/shared/models/password_entry_type.dart';
+import 'package:vaultsafe/shared/models/password_group.dart';
 import 'package:vaultsafe/core/encryption/encryption_service.dart';
 import 'package:vaultsafe/shared/utils/password_generator.dart';
 import 'package:vaultsafe/features/passwords/password_detail_screen.dart';
@@ -28,11 +29,6 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
   PasswordEntry? _selectedEntry; // 当前选中的密码条目
   bool _isEditMode = false; // 是否为编辑模式
 
-  // 默认分组列表
-  final List<String> _defaultGroups = ['personal', 'work'];
-  // 自定义分组列表
-  final List<String> _customGroups = [];
-
   // 检测是否为桌面平台
   bool get _isDesktop => Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 
@@ -42,6 +38,7 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
     // 延迟到第一帧渲染后再加载数据，避免在 widget 树构建期间修改 provider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(passwordEntriesProvider.notifier).loadEntries();
+      ref.read(passwordGroupsProvider.notifier).loadGroups();
     });
   }
 
@@ -106,7 +103,7 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                         final filtered = _searchQuery.isEmpty
                             ? entries
                             : entries.where((e) =>
-                                e.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                                e.title.toLowerCase().contains(_searchQuery.toLowerCase()) || 
                                 e.username.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
 
                         if (filtered.isEmpty) {
@@ -120,7 +117,7 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                                   color: theme.colorScheme.outline,
                                 ),
                                 const SizedBox(height: 16),
-                                Text(
+                                Text( 
                                   '还没有密码',
                                   style: theme.textTheme.titleLarge,
                                 ),
@@ -708,8 +705,8 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
   }
 
   Widget _buildGroupFilter() {
-    // 合并默认分组和自定义分组
-    final allGroups = [..._defaultGroups, ..._customGroups];
+    // 从数据库读取分组列表
+    final groupsAsync = ref.watch(passwordGroupsProvider);
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -717,55 +714,47 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
         children: [
           // 分组筛选列表
           Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  // "全部"选项
-                  FilterChip(
-                    label: const Text('全部'),
-                    selected: _selectedGroupId == null,
-                    onSelected: (selected) {
-                      setState(() => _selectedGroupId = selected ? null : _selectedGroupId);
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  // 动态生成分组选项
-                  ...allGroups.map((groupId) {
-                    String label;
-                    switch (groupId) {
-                      case 'personal':
-                        label = '个人';
-                        break;
-                      case 'work':
-                        label = '工作';
-                        break;
-                      default:
-                        label = groupId; // 自定义分组直接使用名称
-                    }
-
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(label),
-                        selected: _selectedGroupId == groupId,
+            child: groupsAsync.when(
+              data: (groups) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      // "全部"选项
+                      FilterChip(
+                        label: const Text('全部'),
+                        selected: _selectedGroupId == null,
                         onSelected: (selected) {
-                          setState(() {
-                            _selectedGroupId = selected ? groupId : null;
-                          });
+                          setState(() => _selectedGroupId = selected ? null : _selectedGroupId);
                         },
-                        // 自定义分组可以删除
-                        onDeleted: _customGroups.contains(groupId)
-                            ? () {
-                                _deleteGroup(groupId);
-                              }
-                            : null,
                       ),
-                    );
-                  }),
-                ],
-              ),
+                      const SizedBox(width: 8),
+                      // 动态生成分组选项
+                      ...groups.map((group) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: Text(group.name),
+                            selected: _selectedGroupId == group.id,
+                            onSelected: (selected) {
+                              setState(() {
+                                _selectedGroupId = selected ? group.id : null;
+                              });
+                            },
+                            // 所有分组都可以删除
+                            onDeleted: () {
+                              _deleteGroup(group.id);
+                            },
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => const SizedBox.shrink(),
             ),
           ),
           // 新增分组按钮
@@ -835,20 +824,44 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
   }
 
   // 添加新分组
-  void _addGroup(String groupName) {
-    setState(() {
-      if (!_customGroups.contains(groupName) && !_defaultGroups.contains(groupName)) {
-        _customGroups.add(groupName);
-        // 自动选中新创建的分组
-        _selectedGroupId = groupName;
+  void _addGroup(String groupName) async {
+    // 检查是否已存在同名分组
+    final groupsAsync = ref.read(passwordGroupsProvider);
+    groupsAsync.whenData((groups) async {
+      // 检查是否已存在同名分组
+      if (groups.any((g) => g.name == groupName)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('分组"$groupName"已存在')),
+          );
+        }
+        return;
+      }
+
+      // 创建新的分组对象
+      final now = DateTime.now();
+      final newGroup = PasswordGroup(
+        id: const Uuid().v4(),
+        name: groupName,
+        order: groups.length,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      // 保存到数据库
+      await ref.read(passwordGroupsProvider.notifier).addGroup(newGroup);
+
+      // 自动选中新创建的分组
+      setState(() {
+        _selectedGroupId = newGroup.id;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已添加分组：$groupName')),
+        );
       }
     });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已添加分组：$groupName')),
-      );
-    }
   }
 
   // 删除分组
@@ -868,17 +881,26 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
             child: const Text('取消'),
           ),
           FilledButton(
-            onPressed: () {
-              setState(() {
-                _customGroups.remove(groupId);
-                if (_selectedGroupId == groupId) {
-                  _selectedGroupId = null;
-                }
-              });
+            onPressed: () async {
+              // 在异步操作前关闭对话框
               Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('已删除分组')),
-              );
+
+              // 从数据库删除分组
+              await ref.read(passwordGroupsProvider.notifier).deleteGroup(groupId);
+
+              // 如果删除的是当前选中的分组，清空选择
+              if (_selectedGroupId == groupId) {
+                setState(() {
+                  _selectedGroupId = null;
+                });
+              }
+
+              // 显示提示消息
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('已删除分组')),
+                );
+              }
             },
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
@@ -997,11 +1019,6 @@ class _AddPasswordFormState extends ConsumerState<_AddPasswordForm> {
   PasswordEntryType _selectedType = PasswordEntryType.website; // 默认类型
   String? _selectedGroupId; // 选中的分组ID
 
-  // 默认分组列表
-  final List<String> _defaultGroups = ['personal', 'work'];
-  // 自定义分组列表
-  final List<String> _customGroups = [];
-
   @override
   void initState() {
     super.initState();
@@ -1023,51 +1040,50 @@ class _AddPasswordFormState extends ConsumerState<_AddPasswordForm> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
             // 分组选择器
-            DropdownButtonFormField<String>(
-              initialValue: _selectedGroupId,
-              decoration: const InputDecoration(
-                labelText: '分组',
-                prefixIcon: Icon(Icons.folder),
-              ),
-              items: [
-                const DropdownMenuItem(
-                  value: 'default',
-                  child: Row(
-                    children: [
-                      Icon(Icons.folder_outlined, size: 20),
-                      SizedBox(width: 12),
-                      Text('默认'),
-                    ],
+            Consumer(
+              builder: (context, ref, child) {
+                final groupsAsync = ref.watch(passwordGroupsProvider);
+
+                return DropdownButtonFormField<String>(
+                  value: _selectedGroupId,
+                  decoration: const InputDecoration(
+                    labelText: '分组',
+                    prefixIcon: Icon(Icons.folder),
                   ),
-                ),
-                ..._defaultGroups.map((groupId) {
-                  String label;
-                  switch (groupId) {
-                    case 'personal':
-                      label = '个人';
-                      break;
-                    case 'work':
-                      label = '工作';
-                      break;
-                    default:
-                      label = groupId;
-                  }
-                  return DropdownMenuItem(
-                    value: groupId,
-                    child: Row(
-                      children: [
-                        const Icon(Icons.folder_outlined, size: 20),
-                        const SizedBox(width: 12),
-                        Text(label),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => _selectedGroupId = value);
-                }
+                  items: groupsAsync.when(
+                    data: (groups) {
+                      return [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Row(
+                            children: [
+                              Icon(Icons.folder_outlined, size: 20),
+                              SizedBox(width: 12),
+                              Text('无分组'),
+                            ],
+                          ),
+                        ),
+                        ...groups.map((group) {
+                          return DropdownMenuItem(
+                            value: group.id,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.folder_outlined, size: 20),
+                                const SizedBox(width: 12),
+                                Text(group.name),
+                              ],
+                            ),
+                          );
+                        }),
+                      ];
+                    },
+                    loading: () => [],
+                    error: (_, __) => [],
+                  ),
+                  onChanged: (value) {
+                    setState(() => _selectedGroupId = value);
+                  },
+                );
               },
             ),
             const SizedBox(height: 16),
@@ -1322,12 +1338,7 @@ class _EditPasswordFormState extends ConsumerState<_EditPasswordForm> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   late PasswordEntryType _selectedType;
-  late String _selectedGroupId;
-
-  // 默认分组列表
-  final List<String> _defaultGroups = ['personal', 'work'];
-  // 自定义分组列表
-  final List<String> _customGroups = [];
+  late String? _selectedGroupId;
 
   @override
   void initState() {
@@ -1370,51 +1381,50 @@ class _EditPasswordFormState extends ConsumerState<_EditPasswordForm> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // 分组选择器
-            DropdownButtonFormField<String>(
-              initialValue: _selectedGroupId,
-              decoration: const InputDecoration(
-                labelText: '分组',
-                prefixIcon: Icon(Icons.folder),
-              ),
-              items: [
-                const DropdownMenuItem(
-                  value: 'default',
-                  child: Row(
-                    children: [
-                      Icon(Icons.folder_outlined, size: 20),
-                      SizedBox(width: 12),
-                      Text('默认'),
-                    ],
+            Consumer(
+              builder: (context, ref, child) {
+                final groupsAsync = ref.watch(passwordGroupsProvider);
+
+                return DropdownButtonFormField<String>(
+                  value: _selectedGroupId,
+                  decoration: const InputDecoration(
+                    labelText: '分组',
+                    prefixIcon: Icon(Icons.folder),
                   ),
-                ),
-                ..._defaultGroups.map((groupId) {
-                  String label;
-                  switch (groupId) {
-                    case 'personal':
-                      label = '个人';
-                      break;
-                    case 'work':
-                      label = '工作';
-                      break;
-                    default:
-                      label = groupId;
-                  }
-                  return DropdownMenuItem(
-                    value: groupId,
-                    child: Row(
-                      children: [
-                        const Icon(Icons.folder_outlined, size: 20),
-                        const SizedBox(width: 12),
-                        Text(label),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => _selectedGroupId = value);
-                }
+                  items: groupsAsync.when(
+                    data: (groups) {
+                      return [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Row(
+                            children: [
+                              Icon(Icons.folder_outlined, size: 20),
+                              SizedBox(width: 12),
+                              Text('无分组'),
+                            ],
+                          ),
+                        ),
+                        ...groups.map((group) {
+                          return DropdownMenuItem(
+                            value: group.id,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.folder_outlined, size: 20),
+                                const SizedBox(width: 12),
+                                Text(group.name),
+                              ],
+                            ),
+                          );
+                        }),
+                      ];
+                    },
+                    loading: () => [],
+                    error: (_, __) => [],
+                  ),
+                  onChanged: (value) {
+                    setState(() => _selectedGroupId = value);
+                  },
+                );
               },
             ),
             const SizedBox(height: 16),

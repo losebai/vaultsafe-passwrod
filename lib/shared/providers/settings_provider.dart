@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
@@ -9,6 +10,18 @@ import 'package:vaultsafe/shared/models/settings.dart';
 /// 设置通知器
 class SettingsNotifier extends StateNotifier<AsyncValue<AppSettings>> {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
+
+  // 预定义主题颜色列表
+  static const List<Color> _themeColors = [
+    Color(0xFF2196F3), // 蓝色
+    Color(0xFF4CAF50), // 绿色
+    Color(0xFFFF9800), // 橙色
+    Color(0xFFE91E63), // 粉色
+    Color(0xFF9C27B0), // 紫色
+    Color(0xFF00BCD4), // 青色
+    Color(0xFFFF5722), // 深橙色
+    Color(0xFF607D8B), // 蓝灰色
+  ];
 
   SettingsNotifier() : super(const AsyncValue.loading()) {
     _loadSettings();
@@ -41,12 +54,27 @@ class SettingsNotifier extends StateNotifier<AsyncValue<AppSettings>> {
         dataDirectory = path.join(appDocDir.path, 'vault_safe_data');
       }
 
+      // 加载主题颜色
+      final themeColorValue = await _storage.read(key: 'theme_color');
+      Color themeColor = const Color(0xFF2196F3); // 默认蓝色
+      if (themeColorValue != null) {
+        try {
+          final colorValue = int.tryParse(themeColorValue);
+          if (colorValue != null) {
+            themeColor = Color(colorValue);
+          }
+        } catch (e) {
+          // 如果颜色值无效，使用默认颜色
+        }
+      }
+
       final settings = AppSettings(
         biometricEnabled: biometricEnabled,
         autoLockTimeout: Duration(seconds: autoLockSeconds),
         syncEnabled: syncEnabled,
         syncConfig: syncConfig,
         dataDirectory: dataDirectory,
+        themeColor: themeColor,
       );
       state = AsyncValue.data(settings);
     } catch (e, st) {
@@ -89,6 +117,16 @@ class SettingsNotifier extends StateNotifier<AsyncValue<AppSettings>> {
       state = AsyncValue.data(settings.copyWith(dataDirectory: directory));
     });
   }
+
+  Future<void> updateThemeColor(Color color) async {
+    await _storage.write(key: 'theme_color', value: color.toARGB32().toString());
+    state.whenData((settings) {
+      state = AsyncValue.data(settings.copyWith(themeColor: color));
+    });
+  }
+
+  /// 获取可用的主题颜色列表
+  static List<Color> get availableThemeColors => List.unmodifiable(_themeColors);
 }
 
 /// 设置提供者

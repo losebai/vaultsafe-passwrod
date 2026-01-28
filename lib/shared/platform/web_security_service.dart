@@ -60,13 +60,11 @@ class WebSecurityService {
   static void enableCloseWarning(String message) {
     html.window.onBeforeUnload.listen((event) {
       event.preventDefault();
-      event.returnValue = message;
     });
   }
 
   /// Disable close warning
   static void disableCloseWarning() {
-    html.window.onBeforeUnload = null;
   }
 
   /// Check if browser supports crypto API

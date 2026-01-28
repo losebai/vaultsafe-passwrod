@@ -11,9 +11,12 @@ final storageServiceProvider = Provider<StorageService>((ref) {
 
 /// Password entries notifier
 class PasswordEntriesNotifier extends StateNotifier<AsyncValue<List<PasswordEntry>>> {
-  PasswordEntriesNotifier(this._storageService) : super(const AsyncValue.loading());
+  PasswordEntriesNotifier(this._storageService)
+      : log = LogService.instance,
+        super(const AsyncValue.loading());
 
   final StorageService _storageService;
+  final LogService log;
 
   Future<void> loadEntries() async {
     state = const AsyncValue.loading();
@@ -88,9 +91,12 @@ class PasswordEntriesNotifier extends StateNotifier<AsyncValue<List<PasswordEntr
 
 /// Password groups notifier
 class PasswordGroupsNotifier extends StateNotifier<AsyncValue<List<PasswordGroup>>> {
-  PasswordGroupsNotifier(this._storageService) : super(const AsyncValue.loading());
+  PasswordGroupsNotifier(this._storageService)
+      : log = LogService.instance,
+        super(const AsyncValue.loading());
 
   final StorageService _storageService;
+  final LogService log;
 
   Future<void> loadGroups() async {
     state = const AsyncValue.loading();

@@ -14,12 +14,13 @@ final logServiceProvider = Provider<LogService>((ref) {
 ///
 /// 包装日志流，确保初始数据立即可用
 class LogListNotifier extends StateNotifier<List<LogEntry>> {
-  LogListNotifier(this._logService) : super(_logService.logs) {
+  LogListNotifier(this._logService) : super(_logService.logs.reversed.toList()) {
     // 订阅日志流，自动更新状态
     _subscription = _logService.logsStream.listen(
       (logs) {
         if (!mounted) return;
-        state = logs;
+        // 按时间倒序排列（最新的在最前面）
+        state = logs.reversed.toList();
       },
       onError: (error) {
         if (!mounted) return;
@@ -53,7 +54,7 @@ final logFilterLevelProvider = StateProvider<LogLevel>((ref) {
 
 /// 已过滤的日志列表 Provider
 ///
-/// 根据选择的级别过滤日志
+/// 根据选择的级别过滤日志，日志已按时间倒序排列
 final filteredLogsProvider = Provider<List<LogEntry>>((ref) {
   final filterLevel = ref.watch(logFilterLevelProvider);
   final logs = ref.watch(logsProvider);

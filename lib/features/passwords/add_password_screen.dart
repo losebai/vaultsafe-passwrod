@@ -28,11 +28,13 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _isEditMode = false;
+  bool _syncEnabled = true; // 默认启用同步
 
   @override
   void initState() {
     super.initState();
     _isEditMode = widget.entry != null;
+    _syncEnabled = widget.entry?.syncEnabled ?? true; // 从 entry 读取同步状态，默认为 true
 
     _titleController = TextEditingController(text: widget.entry?.title ?? '');
     _websiteController = TextEditingController(text: widget.entry?.website ?? '');
@@ -135,6 +137,17 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
               ),
               maxLines: 3,
             ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: const Text('启用同步'),
+              subtitle: const Text('关闭后此密码仅保存在本地，不会同步到云端'),
+              value: _syncEnabled,
+              onChanged: (value) {
+                setState(() {
+                  _syncEnabled = value;
+                });
+              },
+            ),
             const SizedBox(height: 24),
             FilledButton(
               onPressed: _isLoading ? null : _save,
@@ -180,6 +193,7 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
         groupId: widget.entry?.groupId ?? 'default',
         createdAt: widget.entry?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
+        syncEnabled: _syncEnabled,
       );
 
       if (_isEditMode) {

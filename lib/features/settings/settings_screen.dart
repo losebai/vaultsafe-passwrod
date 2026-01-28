@@ -57,6 +57,14 @@ class SettingsScreen extends ConsumerWidget {
                       onTap: () => _showTimeoutDialog(context, ref, settings.autoLockTimeout),
                     ),
 
+                    const _SectionHeader(title: '外观'),
+                    ListTile(
+                      title: const Text('主题颜色'),
+                      subtitle: const Text('选择应用的主题颜色'),
+                      leading: const Icon(Icons.palette),
+                      onTap: () => _showThemeColorDialog(context, ref, settings.themeColor),
+                    ),
+
                     const _SectionHeader(title: '同步'),
                     SwitchListTile(
                       title: const Text('启用同步'),
@@ -190,6 +198,14 @@ class SettingsScreen extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => StorageDirectoryDialog(currentDirectory: currentDirectory),
+    );
+  }
+
+  // 显示主题颜色选择弹窗
+  void _showThemeColorDialog(BuildContext context, WidgetRef ref, Color currentColor) {
+    showDialog(
+      context: context,
+      builder: (context) => _ThemeColorDialog(currentColor: currentColor),
     );
   }
 
@@ -1778,6 +1794,173 @@ class _ImportConfirmDialogState extends ConsumerState<_ImportConfirmDialog> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 主题颜色选择对话框
+class _ThemeColorDialog extends ConsumerWidget {
+  final Color currentColor;
+
+  const _ThemeColorDialog({required this.currentColor});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final availableColors = SettingsNotifier.availableThemeColors;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 500),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 标题
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.palette,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '主题颜色',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            const Text(
+              '选择您喜欢的主题颜色，应用界面将会即时更新。',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 24),
+
+            // 颜色网格
+            GridView.builder(
+              shrinkWrap: true,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 1,
+              ),
+              itemCount: availableColors.length,
+              itemBuilder: (context, index) {
+                final color = availableColors[index];
+                final isSelected = color == currentColor;
+
+                return GestureDetector(
+                  onTap: () async {
+                    await ref.read(settingsProvider.notifier).updateThemeColor(color);
+                    if (context.mounted) {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected
+                            ? theme.colorScheme.onSurface
+                            : Colors.transparent,
+                        width: 3,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: color.withValues(alpha: 0.4),
+                                blurRadius: 12,
+                                spreadRadius: 2,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: isSelected
+                        ? const Center(
+                            child: Icon(
+                              Icons.check,
+                              color: Colors.white,
+                              size: 32,
+                            ),
+                          )
+                        : null,
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // 当前颜色预览
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: currentColor,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '当前颜色',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '#${currentColor.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontFamily: 'monospace',
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

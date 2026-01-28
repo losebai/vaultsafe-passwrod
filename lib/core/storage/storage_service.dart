@@ -100,19 +100,48 @@ class StorageService {
     }
   }
 
+  /// 递归转换 Map<dynamic, dynamic> 为 Map<String, dynamic>
+  /// 处理嵌套的 Map 和 List
+  Map<String, dynamic> _convertJson(Map<dynamic, dynamic> json) {
+    final result = <String, dynamic>{};
+    json.forEach((key, value) {
+      if (value is Map) {
+        result[key.toString()] = _convertJson(value);
+      } else if (value is List) {
+        result[key.toString()] = _convertList(value);
+      } else {
+        result[key.toString()] = value;
+      }
+    });
+    return result;
+  }
+
+  /// 转换 List<dynamic> 为 List<dynamic>
+  List<dynamic> _convertList(List list) {
+    return list.map((item) {
+      if (item is Map) {
+        return _convertJson(item);
+      } else if (item is List) {
+        return _convertList(item);
+      } else {
+        return item;
+      }
+    }).toList();
+  }
+
   /// 获取所有密码条目
   Future<List<PasswordEntry>> getPasswordEntries() async {
     _ensureInitialized();
 
     final entries = <PasswordEntry>[];
     for (final key in _passwordsBox!.keys) {
-      final json = _passwordsBox!.get(key) as Map<dynamic, dynamic>?;
+      final json = _passwordsBox!.get(key);
       if (json == null) continue;
 
       try {
-        final entry = PasswordEntry.fromJson(
-          Map<String, dynamic>.from(json),
-        );
+        // 将 Map<dynamic, dynamic> 转换为 Map<String, dynamic>
+        final jsonStringified = _convertJson(json);
+        final entry = PasswordEntry.fromJson(jsonStringified);
         entries.add(entry);
       } catch (e) {
         // 跳过无效条目
@@ -126,11 +155,12 @@ class StorageService {
   Future<PasswordEntry?> getPasswordEntry(String id) async {
     _ensureInitialized();
 
-    final json = _passwordsBox!.get(id) as Map<dynamic, dynamic>?;
+    final json = _passwordsBox!.get(id);
     if (json == null) return null;
 
     try {
-      return PasswordEntry.fromJson(Map<String, dynamic>.from(json));
+      final jsonStringified = _convertJson(json);
+      return PasswordEntry.fromJson(jsonStringified);
     } catch (e) {
       return null;
     }
@@ -139,7 +169,7 @@ class StorageService {
   /// 保存密码条目
   Future<void> savePasswordEntry(PasswordEntry entry) async {
     _ensureInitialized();
-
+     log.d('StorageService: 已经初始化，跳过', source: 'StorageService');
     await _passwordsBox!.put(entry.id, entry.toJson());
   }
 
