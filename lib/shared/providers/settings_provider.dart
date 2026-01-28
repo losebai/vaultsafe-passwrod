@@ -68,6 +68,9 @@ class SettingsNotifier extends StateNotifier<AsyncValue<AppSettings>> {
         }
       }
 
+      // 加载自动更新设置
+      final autoUpdateEnabled = await _storage.read(key: 'auto_update_enabled') == 'true';
+
       final settings = AppSettings(
         biometricEnabled: biometricEnabled,
         autoLockTimeout: Duration(seconds: autoLockSeconds),
@@ -75,6 +78,7 @@ class SettingsNotifier extends StateNotifier<AsyncValue<AppSettings>> {
         syncConfig: syncConfig,
         dataDirectory: dataDirectory,
         themeColor: themeColor,
+        autoUpdateEnabled: autoUpdateEnabled,
       );
       state = AsyncValue.data(settings);
     } catch (e, st) {
@@ -122,6 +126,13 @@ class SettingsNotifier extends StateNotifier<AsyncValue<AppSettings>> {
     await _storage.write(key: 'theme_color', value: color.toARGB32().toString());
     state.whenData((settings) {
       state = AsyncValue.data(settings.copyWith(themeColor: color));
+    });
+  }
+
+  Future<void> updateAutoUpdateEnabled(bool value) async {
+    await _storage.write(key: 'auto_update_enabled', value: value.toString());
+    state.whenData((settings) {
+      state = AsyncValue.data(settings.copyWith(autoUpdateEnabled: value));
     });
   }
 

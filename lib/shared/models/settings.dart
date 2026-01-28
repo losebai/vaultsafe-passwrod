@@ -9,6 +9,7 @@ class AppSettings {
   final SyncConfig? syncConfig;
   final String dataDirectory;
   final Color themeColor;
+  final bool autoUpdateEnabled;
 
   AppSettings({
     required this.biometricEnabled,
@@ -17,6 +18,7 @@ class AppSettings {
     this.syncConfig,
     required this.dataDirectory,
     required this.themeColor,
+    this.autoUpdateEnabled = true,
   });
 
   AppSettings copyWith({
@@ -26,6 +28,7 @@ class AppSettings {
     SyncConfig? syncConfig,
     String? dataDirectory,
     Color? themeColor,
+    bool? autoUpdateEnabled,
   }) {
     return AppSettings(
       biometricEnabled: biometricEnabled ?? this.biometricEnabled,
@@ -34,6 +37,7 @@ class AppSettings {
       syncConfig: syncConfig ?? this.syncConfig,
       dataDirectory: dataDirectory ?? this.dataDirectory,
       themeColor: themeColor ?? this.themeColor,
+      autoUpdateEnabled: autoUpdateEnabled ?? this.autoUpdateEnabled,
     );
   }
 }

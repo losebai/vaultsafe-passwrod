@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:vaultsafe/core/sync/sync_auth_type.dart';
 import 'package:vaultsafe/core/sync/sync_config.dart';
 import 'package:vaultsafe/core/sync/sync_interval.dart';
@@ -13,6 +14,7 @@ import 'package:vaultsafe/shared/providers/settings_provider.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
 import 'package:vaultsafe/shared/providers/password_provider.dart';
 import 'package:vaultsafe/features/settings/logs_screen.dart';
+import 'package:vaultsafe/features/update/update_screen.dart';
 
 /// 设置界面
 class SettingsScreen extends ConsumerWidget {
@@ -107,6 +109,28 @@ class SettingsScreen extends ConsumerWidget {
                       leading: const Icon(Icons.upload),
                       onTap: () => _importBackup(context, ref),
                     ),
+                    // 桌面端显示自动更新开关
+                    if (!Platform.isAndroid && !Platform.isIOS)
+                      SwitchListTile(
+                        title: const Text('自动更新'),
+                        subtitle: const Text('每24小时自动检查更新'),
+                        value: settings.autoUpdateEnabled,
+                        onChanged: (value) {
+                          ref.read(settingsProvider.notifier).updateAutoUpdateEnabled(value);
+                        },
+                      ),
+                    ListTile(
+                      title: const Text('检查更新'),
+                      subtitle: const Text('查看应用是否有新版本'),
+                      leading: const Icon(Icons.system_update),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const UpdateScreen(),
+                          ),
+                        );
+                      },
+                    ),
                     ListTile(
                       title: const Text('系统日志'),
                       subtitle: const Text('查看应用程序运行日志'),
@@ -119,37 +143,9 @@ class SettingsScreen extends ConsumerWidget {
                         );
                       },
                     ),
-                  ],
-                ),
-              ),
 
-              // 底部版本信息卡片
-              Container(
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: theme.dividerColor.withValues(alpha: 0.1),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 16,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'VaultSafe v1.0.0',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
+                    // 底部版本信息卡片
+                    _VersionInfoCard(),
                   ],
                 ),
               ),
@@ -1960,6 +1956,106 @@ class _ThemeColorDialog extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 版本信息卡片
+class _VersionInfoCard extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_VersionInfoCard> createState() => _VersionInfoCardState();
+}
+
+class _VersionInfoCardState extends ConsumerState<_VersionInfoCard> {
+  PackageInfo? _packageInfo;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPackageInfo();
+  }
+
+  Future<void> _loadPackageInfo() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _packageInfo = info;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.dividerColor.withValues(alpha: 0.1),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          // 版本信息
+          if (_isLoading)
+            const Center(child: CircularProgressIndicator())
+          else if (_packageInfo != null)
+            Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'VaultSafe v${_packageInfo!.version}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '构建号: ${_packageInfo!.buildNumber}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+
+          const SizedBox(height: 12),
+
+          // 检查更新按钮
+          FilledButton.tonalIcon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const UpdateScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.system_update, size: 18),
+            label: const Text('检查更新'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+          ),
+        ],
       ),
     );
   }

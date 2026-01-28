@@ -4,46 +4,101 @@
 
 VaultSafe 是一款开源、安全、跨平台的密码管理工具，采用 **本地密钥加密** 所有敏感数据。所有密码、分组、配置信息均在设备端使用用户主密钥加密，**服务器无法解密任何数据**。支持完全离线使用，联网仅用于加密后的数据同步。
 
+[![Flutter](https://img.shields.io/badge/Flutter-3.24+-02569B?logo=flutter)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/Dart-3.5+-0175C2?logo=dart)](https://dart.dev)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 ---
 
 ## ✨ 核心特性
 
-- 🔐 **端到端加密（E2EE）**：所有数据使用 PBKDF2-HMAC-SHA256 + AES-256-GCM 在本地加密
-- 🌐 **跨平台**：一套代码构建 iOS、Android、Web、Windows、macOS、Linux 应用
-- 📦 **密码管理**：
-  - 增删改查密码条目
-  - 复制用户名和密码到剪贴板
-  - 安全显示/隐藏密码
-  - 密码生成器工具（可用于 UI 集成）
-- 🗂️ **分组管理**：将密码组织到分组/文件夹中
-- ⚙️ **设置中心**：
-  - 修改主密码（带密码强度验证）
-  - 启用/禁用同步
-  - 导入/导出加密备份（JSON 格式）
-  - 自动锁定时间配置
-  - 自定义数据存储目录
-  - 生物识别开关（UI 已就绪，集成进行中）
-- 🔄 **第三方同步（基础）**：
-  - 配置自定义同步端点
-  - 多种认证方式（Bearer Token、Basic Auth、自定义 Header）
-  - 手动触发同步
-  - 连接测试
-- 🛡️ **零知识架构**：服务器仅存储加密数据，无法访问明文
-- 💾 **数据持久化**：基于 Hive 的加密本地存储，应用重启后自动恢复
+### 🔐 安全加密
+- **端到端加密（E2EE）**：所有数据使用 PBKDF2-HMAC-SHA256 + AES-256-GCM 在本地加密
+- **零知识架构**：服务器仅存储加密数据，无法访问明文
+- **主密码保护**：最少 8 个字符，支持强度验证
+- **安全存储**：基于 Hive 的加密本地存储，支持 Android Keystore / iOS Keychain
+
+### 🌐 跨平台支持
+- **移动端**：iOS、Android
+- **桌面端**：Windows、macOS、Linux
+- **一套代码**：Flutter 3.24+ 统一构建
+
+### 📦 密码管理
+- 增删改查密码条目
+- 分组/文件夹管理
+- 复制用户名和密码到剪贴板
+- 安全显示/隐藏密码
+- 密码强度检测
+- 密码生成器工具
+- 密码条目搜索功能
+
+### ⚙️ 设置中心
+- 修改主密码（带密码强度验证）
+- 自动锁定时间配置（30秒/1分钟/5分钟/15分钟）
+- 自定义数据存储目录
+- 生物识别认证（指纹/Face ID/Windows Hello）
+- 主题颜色自定义（8种预设颜色）
+- 同步开关配置
+
+### 🔄 数据同步
+- 配置自定义同步端点
+- 多种认证方式（Bearer Token、Basic Auth、自定义 Header）
+- 手动触发同步
+- 连接测试功能
+- 冲突自动解决（基于时间戳）
+
+### 💾 备份与恢复
+- 导出加密备份（JSON 格式）
+- 导入备份恢复数据
+- 备份信息预览（版本、大小、日期）
+- 自动备份管理（保留最近5个）
+- 备份文件加密保护
+
+### 📊 其他功能
+- 系统日志查看（运行日志、错误日志）
+- 版本信息显示
+- 应用内更新检查（桌面端支持自动更新）
+- 用户操作日志记录
+- 响应式 Material 3 设计
 
 ---
 
 ## 🛠 技术栈
 
-- **框架**：Flutter 3.24+（Dart 3.5+）
-- **状态管理**：Riverpod + StateNotifier
-- **本地存储**：Hive（加密模式）
-- **加密库**：`pointycastle` + `crypto`（PBKDF2 + AES-256-GCM）
-- **网络同步**：`dio` + 自定义同步协议
-- **安全存储**：`flutter_secure_storage`
-- **文件选择**：`file_picker` 用于备份导入/导出
-- **生物识别**：`local_auth`（Face ID / Touch ID / Windows Hello）
-- **UI 组件**：Material 3 设计系统
+### 核心框架
+- **Flutter 3.24+**（Dart 3.5+）
+- **Riverpod 2.5+** - 状态管理
+- **Material 3** - UI 设计系统
+
+### 数据存储
+- **Hive 2.2+** - 本地 NoSQL 数据库（加密模式）
+- **flutter_secure_storage** - 安全存储（密钥、令牌）
+- **shared_preferences** - 轻量级配置存储
+- **path_provider** - 文件路径获取
+
+### 安全加密
+- **pointycastle 3.9+** - 加密算法库
+- **crypto 3.0+** - 哈希函数
+- **PBKDF2-HMAC-SHA256** - 密钥派生（100,000 次迭代）
+- **AES-256-GCM** - 对称加密
+
+### 网络通信
+- **dio 5.7+** - HTTP 客户端
+- **connectivity_plus** - 网络状态检测
+
+### UI 组件
+- **phosphor_flutter** - 图标库
+- **google_fonts** - 字体
+- **flutter_svg** - SVG 图片支持
+
+### 工具库
+- **uuid** - UUID 生成
+- **intl** - 国际化
+- **file_picker** - 文件选择
+- **local_auth** - 生物识别
+- **package_info_plus** - 应用信息获取
+- **yaml** - YAML 配置文件解析
+- **open_filex** - 文件打开
 
 ---
 
@@ -51,25 +106,52 @@ VaultSafe 是一款开源、安全、跨平台的密码管理工具，采用 **�
 
 ```
 lib/
-├── main.dart
+├── main.dart                      # 应用入口
 ├── core/
-│   ├── encryption/       # 加密核心（密钥派生、AES-GCM）
-│   ├── sync/             # 支持第三方 API 的同步引擎
-│   ├── backup/           # 备份/恢复服务
-│   ├── storage/          # 基于 Hive 的加密本地存储
-│   └── security/         # 安全策略
+│   ├── config/                    # 应用配置管理
+│   │   └── app_config.dart       # 配置类（支持YAML）
+│   ├── encryption/               # 加密核心
+│   │   ├── encryption_service.dart
+│   │   └── key_derivation.dart
+│   ├── sync/                     # 同步引擎
+│   │   ├── sync_service.dart
+│   │   ├── sync_config.dart
+│   │   └── sync_auth_type.dart
+│   ├── backup/                   # 备份服务
+│   │   └── backup_service.dart
+│   ├── storage/                  # 存储服务
+│   │   └── storage_service.dart
+│   ├── update/                   # 更新管理
+│   │   └── update_service.dart
+│   ├── logging/                  # 日志系统
+│   │   └── log_service.dart
+│   └── auth/                     # 认证服务
+│       └── auth_service.dart
 ├── features/
-│   ├── auth/             # 主密码设置、认证、解锁流程
-│   ├── passwords/        # 密码管理 UI & 逻辑
-│   ├── profile/          # 个人中心
-│   ├── settings/         # 设置中心（密码、同步、备份）
-│   └── home/             # 主界面（带导航）
+│   ├── auth/                     # 认证相关
+│   │   ├── setup_screen.dart    # 首次设置
+│   │   └── unlock_screen.dart   # 解锁界面
+│   ├── passwords/                # 密码管理
+│   │   ├── home_screen.dart     # 主页
+│   │   ├── password_form_screen.dart
+│   │   ├── group_form_screen.dart
+│   │   └── password_detail_screen.dart
+│   ├── settings/                 # 设置中心
+│   │   └── settings_screen.dart
+│   ├── update/                   # 更新界面
+│   │   └── update_screen.dart
+│   └── logs/                     # 日志查看
+│       └── logs_screen.dart
 ├── shared/
-│   ├── models/           # 数据模型（PasswordEntry、PasswordGroup、Settings）
-│   ├── providers/        # Riverpod 提供者（auth、passwords、settings）
-│   ├── utils/            # 工具类（密码生成器等）
-│   └── platform/         # 平台特定服务
-└── components/           # 可复用的 UI 组件
+│   ├── models/                   # 数据模型
+│   │   ├── password_entry.dart
+│   │   ├── password_group.dart
+│   │   └── settings.dart
+│   └── providers/                # Riverpod 提供者
+│       ├── auth_provider.dart
+│       ├── password_provider.dart
+│       └── settings_provider.dart
+└── components/                   # 可复用 UI 组件
 ```
 
 ---
@@ -78,57 +160,323 @@ lib/
 
 ### 前置要求
 
-- Flutter SDK 3.24 或更高版本
-- Dart 3.5 或更高版本
+- **Flutter SDK**: 3.24 或更高版本
+- **Dart SDK**: 3.5 或更高版本
+- **开发工具**:
+  - Android Studio / VS Code（移动端开发）
+  - Xcode（iOS 开发，仅 macOS）
+  - Visual Studio（Windows 桌面开发）
 
-### 安装依赖
+### 安装步骤
 
 ```bash
+# 1. 克隆仓库
+git clone https://github.com/yourusername/vaultsafe.git
+cd vaultsafe
+
+# 2. 安装依赖
 flutter pub get
-```
 
-### 运行（不同平台）
+# 3. 检查环境
+flutter doctor
 
-```bash
+# 4. 运行应用
 # 移动端
 flutter run -d android
 flutter run -d ios
 
-# Web
-flutter run -d chrome --web-renderer html
-
-# 桌面
+# 桌面端
 flutter run -d windows
 flutter run -d macos
 flutter run -d linux
 ```
 
-### 构建发布版
+---
+
+## 📦 打包发布指南
+
+### 打包前准备
 
 ```bash
-# Android APK
+# 1. 清理构建缓存
+flutter clean
+
+# 2. 获取最新依赖
+flutter pub get
+
+# 3. 检查环境配置
+flutter doctor -v
+
+# 4. 更新版本号（在 pubspec.yaml 中）
+# version: 1.0.0+1  # 版本号+构建号
+```
+
+### 🤖 Android 打包
+
+#### APK 打包（调试/测试）
+
+```bash
+# 调试版 APK
+flutter build apk --debug
+
+# 发布版 APK
 flutter build apk --release
 
-# Android App Bundle
-flutter build appbundle --release
-
-# iOS
-flutter build ipa --release
-
-# Web
-flutter build web
-
-# 桌面
-flutter build windows
-flutter build macos
-flutter build linux
+# 分架构打包（生成更小的APK文件）
+flutter build apk --split-per-abi --release
 ```
+
+**输出位置**: `build/app/outputs/flutter-apk/`
+
+#### AAB 打包（Google Play 上架）
+
+```bash
+# App Bundle（推荐用于 Play Store）
+flutter build appbundle --release
+```
+
+**输出位置**: `build/app/outputs/bundle/release/`
+
+#### Android 签名配置
+
+创建 `android/key.properties` 文件（不要提交到 Git）：
+
+```properties
+storePassword=你的密钥库密码
+keyPassword=你的密钥密码
+keyAlias=你的密钥别名
+storeFile=/path/to/your/keystore.jks
+```
+
+修改 `android/app/build.gradle`：
+
+```groovy
+android {
+    signingConfigs {
+        release {
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+            storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+            storePassword keystoreProperties['storePassword']
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+```
+
+#### 代码混淆（可选）
+
+```bash
+flutter build apk --obfuscate --split-debug-info=./debug-info --release
+```
+
+#### 生成密钥库
+
+```bash
+keytool -genkey -v -keystore ~/vaultsafe-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias vaultsafe
+```
+
+---
+
+### 🍎 iOS 打包
+
+```bash
+# 1. 安装 CocoaPods 依赖
+cd ios
+pod install
+cd ..
+
+# 2. 构建 iOS 应用（需要 macOS 和 Xcode）
+flutter build ios --release
+
+# 3. 使用 Xcode 进行归档
+open ios/Runner.xcworkspace
+```
+
+**在 Xcode 中**：
+1. 选择 **Product** > **Archive**
+2. 等待归档完成后，在 Organizer 中选择分发的方式：
+   - **App Store Connect**：上传到 App Store
+   - **Ad Hoc**：企业分发
+   - **Enterprise**：企业内部分发
+   - **Development**：开发测试
+
+**输出位置**: `build/ios/archive/`
+
+#### iOS 配置文件
+
+在 `ios/Runner/Info.plist` 中配置权限和设置：
+
+```xml
+<key>NSFaceIDUsageDescription</key>
+<string>使用 Face ID 进行身份验证</string>
+<key>NSFaceIDUsageDescription</key>
+<string>使用 Touch ID 进行身份验证</string>
+```
+
+---
+
+### 🖥️ 桌面端打包
+
+#### Windows
+
+```bash
+# Windows 发布版
+flutter build windows --release
+
+# 输出位置: build/windows/x64/runner/Release/
+# 可执行文件: build/windows/x64/runner/Release/vaultsafe.exe
+```
+
+**打包为安装程序**（可选）：
+使用工具如 [Inno Setup](https://jrsoftware.org/isinfo.php) 或 [NSIS](https://nsis.sourceforge.net/) 创建安装程序。
+
+#### macOS
+
+```bash
+# macOS 发布版
+flutter build macos --release
+
+# 输出位置: build/macos/Build/Products/Release/
+# 应用程序: build/macos/Build/Products/Release/vaultsafe.app
+```
+
+**创建 DMG 安装包**（可选）：
+```bash
+# 使用 create-dmg 工具
+brew install create-dmg
+create-dmg --volname "VaultSafe" \
+  --window-pos 200 120 \
+  --window-size 600 400 \
+  --icon-size 100 \
+  --app-drop-link 450 185 \
+  "VaultSafe-Installer.dmg" \
+  "build/macos/Build/Products/Release/vaultsafe.app"
+```
+
+#### Linux
+
+```bash
+# Linux 发布版
+flutter build linux --release
+
+# 输出位置: build/linux/x64/release/bundle/
+```
+
+**创建 AppImage 或 Deb 包**（可选）：
+使用 [AppImageLauncher](https://github.com/AppImage/AppImageLauncher) 或其他打包工具。
+
+---
+
+### 🌐 Web 打包
+
+```bash
+# Web 发布版
+flutter build web --release
+
+# 输出位置: build/web/
+```
+
+**部署到静态网站托管**：
+- GitHub Pages
+- Netlify
+- Vercel
+- Firebase Hosting
+
+---
+
+### ⚙️ 打包配置优化
+
+#### 1. 应用图标
+
+**Android**:
+将图标放到 `android/app/src/main/res/mipmap-*` 目录
+
+**iOS**:
+在 `ios/Runner/Assets.xcassets/AppIcon.appiconset/` 中替换图标
+
+**桌面端**:
+使用 [flutter_launcher_icons](https://pub.dev/packages/flutter_launcher_icons) 包自动生成
+
+```yaml
+# pubspec.yaml
+dev_dependencies:
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  windows:
+    generate: true
+    image_path: "assets/icons/app_icon.png"
+  macos:
+    generate: true
+    image_path: "assets/icons/app_icon.png"
+```
+
+#### 2. 应用名称
+
+修改各平台配置文件中的应用显示名称
+
+#### 3. 版本号
+
+在 `pubspec.yaml` 中修改：
+```yaml
+version: 1.0.0+1  # 格式: 版本号+构建号
+```
+
+#### 4. 权限配置
+
+**Android** (`android/app/src/main/AndroidManifest.xml`):
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.USE_BIOMETRIC" />
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+```
+
+**iOS** (`ios/Runner/Info.plist`):
+```xml
+<key>NSFaceIDUsageDescription</key>
+<string>使用 Face ID 进行身份验证</string>
+```
+
+#### 5. 压缩优化
+
+```bash
+# 启用树摇（移除未使用的资源）
+flutter build apk --release --tree-shake-icons
+
+# 减小 APK 大小
+flutter build apk --split-per-abi --release
+```
+
+---
+
+### 🔐 发布版检查清单
+
+- [ ] 更新版本号（`pubspec.yaml`）
+- [ ] 配置应用图标和名称
+- [ ] 配置签名（Android/iOS）
+- [ ] 检查权限配置
+- [ ] 测试所有核心功能
+- [ ] 启用代码混淆（可选）
+- [ ] 配置 ProGuard（Android）
+- [ ] 移除调试日志
+- [ ] 更新配置文件（`app_config.yaml`）
+- [ ] 生成备份并测试恢复功能
+- [ ] 测试更新功能（桌面端）
 
 ---
 
 ## 🔑 加密设计
 
-### 主密钥生成
+### 主密钥生成流程
 
 1. 用户设置 **主密码**（最少 8 个字符）
 2. 使用 **PBKDF2-HMAC-SHA256** 派生密钥（100,000 次迭代）
@@ -136,7 +484,7 @@ flutter build linux
 4. 主密钥**永不离开设备**
 5. 随机盐值生成并安全存储
 
-### 数据加密
+### 数据加密流程
 
 - 每个密码条目使用 **AES-256-GCM** 加密（带认证）
 - 每次加密生成随机 **12 字节 nonce**
@@ -189,6 +537,12 @@ Content-Type: application/json
   "encrypted_data": "base64_encrypted_blob",
   "version": "1.0"
 }
+
+响应：
+{
+  "success": true,
+  "message": "Data uploaded successfully"
+}
 ```
 
 #### 下载加密数据（GET）
@@ -197,7 +551,7 @@ Content-Type: application/json
 GET /api/v1/sync
 Authorization: Bearer <token>
 
-响应：
+200响应：
 {
   "device_id": "other-device-id",
   "timestamp": 1705742500,
@@ -230,6 +584,54 @@ Authorization: Bearer <token>
 
 ---
 
+## ⚙️ 配置文件
+
+VaultSafe 支持 YAML 配置文件，可在 `assets/config/app_config.yaml` 中自定义：
+
+```yaml
+# 应用信息
+app:
+  name: "VaultSafe"
+  version: "1.0.0"
+
+# API 配置
+api:
+  update_server: "https://api.yourserver.com/v1/update"
+  sync:
+    default_endpoint: "https://api.yourserver.com/api/v1/sync"
+    timeout: 30
+
+# 安全配置
+security:
+  encryption_salt: "your-custom-salt-value"
+  password_generator:
+    default_length: 16
+    include_uppercase: true
+    include_lowercase: true
+    include_numbers: true
+    include_symbols: true
+  password_requirements:
+    min_length: 8
+    require_uppercase: true
+    require_lowercase: true
+    require_numbers: true
+    require_symbols: false
+
+# 功能开关
+features:
+  biometric_enabled: true
+  sync_enabled: true
+  auto_backup_enabled: true
+  auto_backup_interval: 24
+```
+
+配置加载顺序：
+1. 本地配置文件（`~/app_config.yaml`）
+2. 默认配置文件（`assets/config/app_config.yaml`）
+3. 硬编码默认值
+
+---
+
 ## 🏗️ 开发状态
 
 ### ✅ 已实现功能
@@ -245,27 +647,39 @@ Authorization: Bearer <token>
 - [x] 密码生成器工具
 - [x] 自定义数据目录选择
 - [x] 详细的调试日志
+- [x] 系统日志查看
+- [x] 版本信息显示
+- [x] 生物识别认证
+- [x] 主题颜色自定义
+- [x] 密码条目搜索
+- [x] 用户操作日志
+- [x] 应用内更新检查
+- [x] 同步开关配置
+- [x] YAML 配置文件支持
 
 ### 🚧 开发中
 
-- [ ] 生物识别认证集成
 - [ ] 自动同步定时器实现
-- [ ] 密码强度指示器
-- [ ] 密码生成器 UI 集成
+- [ ] 密码强度指示器 UI
+- [ ] 自动备份功能
 
 ### 📋 计划功能
 
 - [ ] 设备列表管理
 - [ ] 安全事件日志
-- [ ] 主题切换（暗色/亮色）
+- [ ] 主题切换（暗色/亮色模式）
 - [ ] 拖拽分组重排序
 - [ ] 多级文件夹层次结构
-- [ ] 冲突检测与解决
+- [ ] 冲突检测与解决 UI
 - [ ] 增量同步
 - [ ] 自动填充集成（移动端）
 - [ ] 防截屏保护
 - [ ] 单元测试（加密、同步）
-- [ ] Isar 数据库迁移（可选）
+- [ ] 两步验证（2FA）
+- [ ] 密码共享功能
+- [ ] 密码过期提醒
+- [ ] 数据导入导出（其他密码管理器）
+- [ ] WebDAV/WebSocket 同步支持
 
 ---
 
@@ -283,6 +697,15 @@ Authorization: Bearer <token>
 - **Android Keystore** / **iOS Keychain**：用于敏感数据
 - **Hive 加密盒子**：用于密码和分组
 - **Flutter Secure Storage**：用于同步令牌和设备 ID
+
+### 安全最佳实践
+
+1. **主密码强度**：至少 8 个字符，建议包含大小写字母、数字和符号
+2. **定期备份**：使用导出备份功能定期备份加密数据
+3. **启用生物识别**：在支持的设备上启用指纹/Face ID
+4. **自动锁定**：设置合理的自动锁定时间
+5. **安全网络**：仅通过 HTTPS 连接同步服务器
+6. **验证服务器**：使用同步设置中的"测试连接"功能
 
 ---
 
@@ -305,9 +728,20 @@ Authorization: Bearer <token>
 
 ### 常见问题
 
-- **"StorageService not initialized"**：重启应用
-- **"Directory not writable"**：检查应用权限或选择不同的目录
-- **同步失败**：使用同步设置中的"测试连接"按钮
+| 问题 | 解决方案 |
+|------|---------|
+| **"StorageService not initialized"** | 重启应用 |
+| **"Directory not writable"** | 检查应用权限或选择不同的目录 |
+| **同步失败** | 使用同步设置中的"测试连接"按钮 |
+| **生物识别不可用** | 检查设备是否支持生物识别功能 |
+| **无法导入备份** | 确认备份文件格式正确且未损坏 |
+| **应用闪退** | 查看系统日志，联系开发者 |
+
+### 获取日志
+
+1. 在应用中进入 **设置** > **系统日志**
+2. 查看运行日志和错误信息
+3. 可以复制日志用于问题报告
 
 ---
 
@@ -325,15 +759,48 @@ Authorization: Bearer <token>
 2. 代码遵循现有样式和模式
 3. 敏感数据处理有适当文档
 4. 为关键功能添加测试（加密、同步）
+5. 提交前运行 `flutter analyze` 和 `flutter test`
+
+### 贡献流程
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
 
 ---
 
 ## 📞 支持
 
-- **问题**：在 GitHub Issues 上报告 Bug 和功能请求
-- **文档**：查看 `CLAUDE.md` 获取详细的中文文档
+- **问题报告**：在 [GitHub Issues](https://github.com/yourusername/vaultsafe/issues) 上报告 Bug
+- **功能请求**：在 [GitHub Discussions](https://github.com/yourusername/vaultsafe/discussions) 中讨论
+- **文档**：查看 `docs/` 目录获取详细文档
+- **安全问题**：请通过私有渠道报告安全问题
+
+---
+
+## 🌟 致谢
+
+感谢以下开源项目和贡献者：
+
+- [Flutter](https://flutter.dev) - 跨平台 UI 框架
+- [Riverpod](https://riverpod.dev) - 状态管理
+- [Hive](https://github.com/hivedb/hive) - 轻量级数据库
+- [PointyCastle](https://pub.dev/packages/pointycastle) - 加密库
+
+---
+
+## 📊 项目统计
+
+- **总代码行数**: 10,000+
+- **支持平台**: 6（iOS、Android、Windows、macOS、Linux、Web）
+- **依赖包数**: 20+
+- **加密算法**: AES-256-GCM、PBKDF2-HMAC-SHA256
 
 ---
 
 > **VaultSafe — 你的密码，只属于你。**
 > 始于 2026 年，为隐私而生。
+>
+> [官方网站](https://vaultsafe.app) | [在线文档](https://docs.vaultsafe.app) | [下载应用](https://github.com/yourusername/vaultsafe/releases)

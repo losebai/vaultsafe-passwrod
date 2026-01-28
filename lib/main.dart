@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:vaultsafe/core/storage/storage_service.dart';
 import 'package:vaultsafe/core/logging/log_service.dart';
+import 'package:vaultsafe/core/update/auto_update_manager.dart';
+import 'package:vaultsafe/core/config/app_config.dart';
 import 'package:vaultsafe/features/auth/auth_service.dart';
 import 'package:vaultsafe/features/auth/auth_screen.dart';
 import 'package:vaultsafe/shared/providers/password_provider.dart';
@@ -27,6 +30,11 @@ void main() async {
   // 初始化日志服务
   final logService = LogService.instance;
   logService.i('应用程序启动', source: 'Main');
+
+  // 初始化配置服务
+  final configService = ConfigService.instance;
+  await configService.loadConfig();
+  logService.i('配置服务初始化完成', source: 'Main');
 
   // 先读取数据目录设置
   String? dataDirectory = await _getDataDirectory();
@@ -65,11 +73,37 @@ void main() async {
   );
 }
 
-class VaultSafeApp extends ConsumerWidget {
+class VaultSafeApp extends ConsumerStatefulWidget {
   const VaultSafeApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<VaultSafeApp> createState() => _VaultSafeAppState();
+}
+
+class _VaultSafeAppState extends ConsumerState<VaultSafeApp> {
+  @override
+  void initState() {
+    super.initState();
+    // 初始化桌面端自动更新
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeAutoUpdate(ref);
+    });
+  }
+
+  Future<void> _initializeAutoUpdate(WidgetRef ref) async {
+    // 仅在桌面端启用自动更新
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      final settingsAsync = ref.read(settingsProvider);
+      settingsAsync.whenData((settings) {
+        if (settings.autoUpdateEnabled) {
+          ref.read(autoUpdateManagerProvider).initialize(autoCheck: true);
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final settingsAsync = ref.watch(settingsProvider);
 
     return MaterialApp(
