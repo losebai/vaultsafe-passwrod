@@ -36,6 +36,8 @@ class PasswordEntriesNotifier extends StateNotifier<AsyncValue<List<PasswordEntr
   Future<void> addEntry(PasswordEntry entry) async {
     try {
       await _storageService.savePasswordEntry(entry);
+      // 记录用户操作日志
+      log.i('新增密码: ${entry.title} (${entry.username})', source: 'UserOperation');
       await loadEntries();
     } catch (e, st) {
       state.whenData((entries) {
@@ -47,6 +49,8 @@ class PasswordEntriesNotifier extends StateNotifier<AsyncValue<List<PasswordEntr
   Future<void> updateEntry(PasswordEntry entry) async {
     try {
       await _storageService.savePasswordEntry(entry);
+      // 记录用户操作日志
+      log.i('修改密码: ${entry.title} (${entry.username})', source: 'UserOperation');
       await loadEntries();
     } catch (e, st) {
       state.whenData((entries) {
@@ -57,7 +61,13 @@ class PasswordEntriesNotifier extends StateNotifier<AsyncValue<List<PasswordEntr
 
   Future<void> deleteEntry(String id) async {
     try {
+      // 在删除前获取密码信息以便记录日志
+      final entry = state.value?.firstWhere((e) => e.id == id);
       await _storageService.deletePasswordEntry(id);
+      // 记录用户操作日志
+      if (entry != null) {
+        log.i('删除密码: ${entry.title} (${entry.username})', source: 'UserOperation');
+      }
       await loadEntries();
     } catch (e, st) {
       state.whenData((entries) {
@@ -95,6 +105,8 @@ class PasswordGroupsNotifier extends StateNotifier<AsyncValue<List<PasswordGroup
   Future<void> addGroup(PasswordGroup group) async {
     try {
       await _storageService.saveGroup(group);
+      // 记录用户操作日志
+      log.i('新增分组: ${group.name}', source: 'UserOperation');
       await loadGroups();
     } catch (e, st) {
       state.whenData((groups) {
@@ -106,6 +118,8 @@ class PasswordGroupsNotifier extends StateNotifier<AsyncValue<List<PasswordGroup
   Future<void> updateGroup(PasswordGroup group) async {
     try {
       await _storageService.saveGroup(group);
+      // 记录用户操作日志
+      log.i('修改分组: ${group.name}', source: 'UserOperation');
       await loadGroups();
     } catch (e, st) {
       state.whenData((groups) {
@@ -116,7 +130,13 @@ class PasswordGroupsNotifier extends StateNotifier<AsyncValue<List<PasswordGroup
 
   Future<void> deleteGroup(String id) async {
     try {
+      // 在删除前获取分组信息以便记录日志
+      final group = state.value?.firstWhere((g) => g.id == id);
       await _storageService.deleteGroup(id);
+      // 记录用户操作日志
+      if (group != null) {
+        log.i('删除分组: ${group.name}', source: 'UserOperation');
+      }
       await loadGroups();
     } catch (e, st) {
       state.whenData((groups) {

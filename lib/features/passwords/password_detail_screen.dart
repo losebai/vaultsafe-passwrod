@@ -7,6 +7,7 @@ import 'package:vaultsafe/shared/models/password_entry.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
 import 'package:vaultsafe/shared/providers/password_provider.dart';
 import 'package:vaultsafe/shared/platform/platform_service.dart';
+import 'package:vaultsafe/core/logging/log_service.dart';
 
 /// 密码详情界面 - 显示和复制密码
 class PasswordDetailScreen extends ConsumerStatefulWidget {
@@ -205,6 +206,9 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
 
   Future<void> _copyToClipboard(String text, String label) async {
     await Clipboard.setData(ClipboardData(text: text));
+
+    // 记录用户操作日志
+    log.i('复制${widget.entry.title}的$label', source: 'UserOperation');
 
     if (!mounted) return;
 
