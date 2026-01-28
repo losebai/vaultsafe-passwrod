@@ -376,9 +376,21 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                     child: _isEditMode
                         ? _EditPasswordForm(
                             entry: _selectedEntry!,
-                            onSave: () {
-                              setState(() {
-                                _isEditMode = false;
+                            onSave: () async {
+                              // 等待 provider 完成数据刷新
+                              await ref.read(passwordEntriesProvider.notifier).loadEntries();
+                              // 从更新后的列表中获取最新的 entry
+                              ref.read(passwordEntriesProvider).whenData((entries) {
+                                final updatedEntry = entries.firstWhere(
+                                  (e) => e.id == _selectedEntry!.id,
+                                  orElse: () => _selectedEntry!,
+                                );
+                                if (mounted) {
+                                  setState(() {
+                                    _selectedEntry = updatedEntry;
+                                    _isEditMode = false;
+                                  });
+                                }
                               });
                             },
                             onCancel: () {
@@ -1016,8 +1028,9 @@ class _AddPasswordFormState extends ConsumerState<_AddPasswordForm> {
 
   bool _isLoading = false;
   bool _obscurePassword = true;
-  PasswordEntryType _selectedType = PasswordEntryType.website; // 默认类型
-  String? _selectedGroupId; // 选中的分组ID
+  PasswordEntryType _selectedType = PasswordEntryType.website;
+  String? _selectedGroupId;
+  bool _syncEnabled = true;
 
   @override
   void initState() {
@@ -1027,7 +1040,7 @@ class _AddPasswordFormState extends ConsumerState<_AddPasswordForm> {
     _usernameController = TextEditingController();
     _passwordController = TextEditingController();
     _notesController = TextEditingController();
-    _selectedGroupId = 'default'; // 默认选中 default 分组
+    _selectedGroupId = 'default';
   }
 
   @override
@@ -1045,7 +1058,6 @@ class _AddPasswordFormState extends ConsumerState<_AddPasswordForm> {
                 final groupsAsync = ref.watch(passwordGroupsProvider);
 
                 return DropdownButtonFormField<String>(
-                  value: _selectedGroupId,
                   decoration: const InputDecoration(
                     labelText: '分组',
                     prefixIcon: Icon(Icons.folder),
@@ -1080,6 +1092,10 @@ class _AddPasswordFormState extends ConsumerState<_AddPasswordForm> {
                     loading: () => [],
                     error: (_, __) => [],
                   ),
+                  initialValue: groupsAsync.whenData((groups) {
+                    final validIds = groups.map((g) => g.id).toSet();
+                    return validIds.contains(_selectedGroupId) ? _selectedGroupId : null;
+                  }).value,
                   onChanged: (value) {
                     setState(() => _selectedGroupId = value);
                   },
@@ -1170,24 +1186,27 @@ class _AddPasswordFormState extends ConsumerState<_AddPasswordForm> {
               decoration: InputDecoration(
                 labelText: '密码',
                 prefixIcon: const Icon(Icons.lock),
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.refresh),
-                      onPressed: _generatePassword,
-                      tooltip: '生成密码',
-                    ),
-                    IconButton(
-                      icon: Icon(_obscurePassword
-                          ? Icons.visibility
-                          : Icons.visibility_off),
-                      onPressed: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
-                      },
-                      tooltip: '显示/隐藏密码',
-                    ),
-                  ],
+                suffixIcon: SizedBox(
+                  width: 100,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: _generatePassword,
+                        tooltip: '生成密码',
+                      ),
+                      IconButton(
+                        icon: Icon(_obscurePassword
+                            ? Icons.visibility
+                            : Icons.visibility_off),
+                        onPressed: () {
+                          setState(() => _obscurePassword = !_obscurePassword);
+                        },
+                        tooltip: '显示/隐藏密码',
+                      ),
+                    ],
+                  ),
                 ),
               ),
               validator: (value) {
@@ -1206,6 +1225,17 @@ class _AddPasswordFormState extends ConsumerState<_AddPasswordForm> {
                 prefixIcon: Icon(Icons.notes),
               ),
               maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: const Text('启用同步'),
+              subtitle: const Text('关闭后此密码仅保存在本地，不会同步到云端'),
+              value: _syncEnabled,
+              onChanged: (value) {
+                setState(() {
+                  _syncEnabled = value;
+                });
+              },
             ),
             const SizedBox(height: 24),
 
@@ -1244,7 +1274,6 @@ class _AddPasswordFormState extends ConsumerState<_AddPasswordForm> {
       // 导入加密服务
       final encrypted = EncryptionService.encrypt(_passwordController.text, masterKey);
 
-      // 创建密码条目
       final entry = PasswordEntry(
         id: const Uuid().v4(),
         title: _titleController.text,
@@ -1255,7 +1284,8 @@ class _AddPasswordFormState extends ConsumerState<_AddPasswordForm> {
         groupId: _selectedGroupId ?? 'default',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
-        type: _selectedType, // 使用选中的类型
+        type: _selectedType,
+        syncEnabled: _syncEnabled,
       );
 
       await ref.read(passwordEntriesProvider.notifier).addEntry(entry);
@@ -1339,6 +1369,7 @@ class _EditPasswordFormState extends ConsumerState<_EditPasswordForm> {
   bool _obscurePassword = true;
   late PasswordEntryType _selectedType;
   late String? _selectedGroupId;
+  late bool _syncEnabled;
 
   @override
   void initState() {
@@ -1350,6 +1381,7 @@ class _EditPasswordFormState extends ConsumerState<_EditPasswordForm> {
     _notesController = TextEditingController(text: widget.entry.notes ?? '');
     _selectedType = widget.entry.type;
     _selectedGroupId = widget.entry.groupId;
+    _syncEnabled = widget.entry.syncEnabled;
     _decryptPassword();
   }
 
@@ -1386,7 +1418,6 @@ class _EditPasswordFormState extends ConsumerState<_EditPasswordForm> {
                 final groupsAsync = ref.watch(passwordGroupsProvider);
 
                 return DropdownButtonFormField<String>(
-                  value: _selectedGroupId,
                   decoration: const InputDecoration(
                     labelText: '分组',
                     prefixIcon: Icon(Icons.folder),
@@ -1421,6 +1452,10 @@ class _EditPasswordFormState extends ConsumerState<_EditPasswordForm> {
                     loading: () => [],
                     error: (_, __) => [],
                   ),
+                  initialValue: groupsAsync.whenData((groups) {
+                    final validIds = groups.map((g) => g.id).toSet();
+                    return validIds.contains(_selectedGroupId) ? _selectedGroupId : null;
+                  }).value,
                   onChanged: (value) {
                     setState(() => _selectedGroupId = value);
                   },
@@ -1511,24 +1546,27 @@ class _EditPasswordFormState extends ConsumerState<_EditPasswordForm> {
               decoration: InputDecoration(
                 labelText: '密码',
                 prefixIcon: const Icon(Icons.lock),
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.refresh),
-                      onPressed: _generatePassword,
-                      tooltip: '生成密码',
-                    ),
-                    IconButton(
-                      icon: Icon(_obscurePassword
-                          ? Icons.visibility
-                          : Icons.visibility_off),
-                      onPressed: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
-                      },
-                      tooltip: '显示/隐藏密码',
-                    ),
-                  ],
+                suffixIcon: SizedBox(
+                  width: 100,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: _generatePassword,
+                        tooltip: '生成密码',
+                      ),
+                      IconButton(
+                        icon: Icon(_obscurePassword
+                            ? Icons.visibility
+                            : Icons.visibility_off),
+                        onPressed: () {
+                          setState(() => _obscurePassword = !_obscurePassword);
+                        },
+                        tooltip: '显示/隐藏密码',
+                      ),
+                    ],
+                  ),
                 ),
               ),
               validator: (value) {
@@ -1547,6 +1585,17 @@ class _EditPasswordFormState extends ConsumerState<_EditPasswordForm> {
                 prefixIcon: Icon(Icons.notes),
               ),
               maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: const Text('启用同步'),
+              subtitle: const Text('关闭后此密码仅保存在本地，不会同步到云端'),
+              value: _syncEnabled,
+              onChanged: (value) {
+                setState(() {
+                  _syncEnabled = value;
+                });
+              },
             ),
             const SizedBox(height: 24),
 
@@ -1601,7 +1650,6 @@ class _EditPasswordFormState extends ConsumerState<_EditPasswordForm> {
       // 加密新密码
       final encrypted = EncryptionService.encrypt(_passwordController.text, masterKey);
 
-      // 更新密码条目
       final updatedEntry = widget.entry.copyWith(
         title: _titleController.text,
         website: _websiteController.text,
@@ -1611,6 +1659,7 @@ class _EditPasswordFormState extends ConsumerState<_EditPasswordForm> {
         groupId: _selectedGroupId,
         type: _selectedType,
         updatedAt: DateTime.now(),
+        syncEnabled: _syncEnabled,
       );
 
       await ref.read(passwordEntriesProvider.notifier).updateEntry(updatedEntry);

@@ -28,13 +28,13 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _isEditMode = false;
-  bool _syncEnabled = true; // 默认启用同步
+  bool _syncEnabled = true;
 
   @override
   void initState() {
     super.initState();
     _isEditMode = widget.entry != null;
-    _syncEnabled = widget.entry?.syncEnabled ?? true; // 从 entry 读取同步状态，默认为 true
+    _syncEnabled = widget.entry?.syncEnabled ?? true;
 
     _titleController = TextEditingController(text: widget.entry?.title ?? '');
     _websiteController = TextEditingController(text: widget.entry?.website ?? '');
@@ -104,21 +104,24 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
               decoration: InputDecoration(
                 labelText: _isEditMode ? '新密码（留空保持不变）' : '密码',
                 border: const OutlineInputBorder(),
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.refresh),
-                      onPressed: _generatePassword,
-                      tooltip: '生成密码',
-                    ),
-                    IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
-                      onPressed: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
-                      },
-                    ),
-                  ],
+                suffixIcon: SizedBox(
+                  width: 100,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: _generatePassword,
+                        tooltip: '生成密码',
+                      ),
+                      IconButton(
+                        icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                        onPressed: () {
+                          setState(() => _obscurePassword = !_obscurePassword);
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
               validator: (value) {

@@ -40,7 +40,7 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
           _decryptedPassword = decrypted;
         });
       } catch (e) {
-        // Handle decryption error
+        // 忽略解密错误，保持密码隐藏状态
       }
     }
   }
@@ -66,7 +66,6 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
       body: ListView(
         padding: const EdgeInsets.all(5),
         children: [
-          // Title card
           Card(
             child: ListTile(
               leading: CircleAvatar(
@@ -85,7 +84,6 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Username
           _buildDetailTile(
             icon: Icons.person,
             label: '用户名',
@@ -93,7 +91,6 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
             onCopy: () => _copyToClipboard(widget.entry.username, '用户名'),
           ),
 
-          // Password
           Card(
             child: ListTile(
               leading: const Icon(Icons.lock),
@@ -123,7 +120,6 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
             ),
           ),
 
-          // Website
           _buildDetailTile(
             icon: Icons.language,
             label: '网站',
@@ -131,7 +127,6 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
             onCopy: () => _copyToClipboard(widget.entry.website, '网站'),
           ),
 
-          // Notes
           if (widget.entry.notes != null && widget.entry.notes!.isNotEmpty) ...[
             const SizedBox(height: 16),
             Card(
@@ -152,7 +147,6 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
             ),
           ],
 
-          // Metadata
           const SizedBox(height: 16),
           Card(
             child: Column(
