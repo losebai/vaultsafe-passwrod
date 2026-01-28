@@ -780,24 +780,6 @@ features:
 
 ---
 
-## 🌟 致谢
-
-感谢以下开源项目和贡献者：
-
-- [Flutter](https://flutter.dev) - 跨平台 UI 框架
-- [Riverpod](https://riverpod.dev) - 状态管理
-- [Hive](https://github.com/hivedb/hive) - 轻量级数据库
-- [PointyCastle](https://pub.dev/packages/pointycastle) - 加密库
-
----
-
-## 📊 项目统计
-
-- **总代码行数**: 10,000+
-- **支持平台**: 6（iOS、Android、Windows、macOS、Linux、Web）
-- **依赖包数**: 20+
-- **加密算法**: AES-256-GCM、PBKDF2-HMAC-SHA256
-
 ---
 
 > **VaultSafe — 你的密码，只属于你。**
