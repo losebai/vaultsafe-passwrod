@@ -65,6 +65,9 @@ dev_dependencies:
   json_serializable: ^6.7.0
   hive_generator: ^2.0.0
 
+  # App Icons
+  flutter_launcher_icons: ^0.13.1
+
 flutter:
   uses-material-design: true
 
@@ -79,3 +82,15 @@ flutter:
   #       - asset: fonts/CustomFont-Regular.ttf
   #       - asset: fonts/CustomFont-Bold.ttf
   #         weight: 700
+
+# App Icons Configuration
+flutter_launcher_icons:
+  android: true
+  windows:
+    generate: true
+    image_path: "assets/icons/image.png"
+    icon_size: 256 # min:48, max:256, default: 48
+  image_path: "assets/icons/image.png"
+  adaptive_icon_background: "#004878"
+  adaptive_icon_foreground: "assets/icons/image.png"
+  min_sdk_android: 21 # android min sdk min:16, default 21
