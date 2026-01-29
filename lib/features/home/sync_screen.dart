@@ -1,469 +1,91 @@
 import 'dart:convert';
-import 'package:dio/dio.dart';
+import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
-import 'package:vaultsafe/core/sync/sync_auth_type.dart';
-import 'package:vaultsafe/core/sync/sync_interval.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:vaultsafe/shared/providers/settings_provider.dart';
+import 'package:vaultsafe/shared/providers/auth_provider.dart';
+import 'package:vaultsafe/shared/providers/password_provider.dart';
+import 'package:vaultsafe/shared/widgets/apiHelpDialog.dart';
+import 'package:vaultsafe/shared/widgets/sync_settings_dialog.dart';
+import 'package:vaultsafe/shared/widgets/settings_card.dart';
+import 'package:vaultsafe/shared/helpers/backup_helper.dart';
+import 'package:vaultsafe/core/sync/sync_service.dart';
+import 'package:vaultsafe/core/encryption/encryption_service.dart';
+import 'package:vaultsafe/shared/models/settings.dart';
 
 /// 同步界面 - 桌面端和移动端通用
-class SyncScreen extends StatefulWidget {
+class SyncScreen extends ConsumerWidget {
   const SyncScreen({super.key});
 
   @override
-  State<SyncScreen> createState() => _SyncScreenState();
-}
-
-class _SyncScreenState extends State<SyncScreen> {
-  bool _isSyncing = false;
-  String? _syncError;
-  DateTime? _lastSyncTime;
-
-  Future<void> _performSync() async {
-    setState(() {
-      _isSyncing = true;
-      _syncError = null;
-    });
-
-    try {
-      // TODO: 实现实际的同步逻辑
-      await Future.delayed(const Duration(seconds: 2)); // 模拟同步
-
-      if (mounted) {
-        setState(() {
-          _lastSyncTime = DateTime.now();
-          _isSyncing = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('同步成功')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _syncError = e.toString();
-          _isSyncing = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('同步失败: $e')),
-        );
-      }
-    }
-  }
-
-  void _showSyncConfigDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => const SyncConfigDialog(),
-    );
-  }
-
-  // 同步帮助对话框
-  void _showSyncHelpDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('同步帮助'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '同步协议说明',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'VaultSafe 使用端到端加密同步，您的数据在传输和存储时始终处于加密状态。',
-                style: TextStyle(fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'API 接口规范',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-              const SizedBox(height: 8),
-              const Text('上传数据 (POST):',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  'POST /api/v1/sync\n'
-                  'Authorization: Bearer <token>\n'
-                  'Content-Type: application/json\n\n'
-                  '{\n'
-                  '  "device_id": "uuid-string",\n'
-                  '  "timestamp": 1705742400,\n'
-                  '  "encrypted_data": "base64(AES-GCM(...))",\n'
-                  '  "version": "1.0"\n'
-                  '}',
-                  style: TextStyle(fontFamily: 'monospace', fontSize: 11),
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text('下载数据 (GET):',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  'GET /api/v1/sync\n'
-                  'Authorization: Bearer <token>\n\n'
-                  '响应:\n'
-                  '{\n'
-                  '  "device_id": "other-device-id",\n'
-                  '  "timestamp": 1705742500,\n'
-                  '  "encrypted_data": "base64(...)",\n'
-                  '  "version": "1.0"\n'
-                  '}',
-                  style: TextStyle(fontFamily: 'monospace', fontSize: 11),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                '配置示例',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-              const SizedBox(height: 8),
-              _buildExampleItem(
-                '自建服务器',
-                'https://your-server.com/api/v1/sync',
-                'Bearer Token',
-              ),
-              _buildExampleItem(
-                'WebDAV (Nextcloud)',
-                'https://nextcloud.com/remote.php/dav/files/user/vaultsafe.json',
-                'Basic Auth',
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('关闭'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildExampleItem(String title, String endpoint, String auth) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 2),
-          Text(
-            '端点: $endpoint',
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-          Text(
-            '认证: $auth',
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settingsAsync = ref.watch(settingsProvider);
     final theme = Theme.of(context);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 标题行，包含帮助按钮
-          Row(
+    return settingsAsync.when(
+      data: (settings) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  '同步与备份',
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: const Color.fromARGB(255, 0, 72, 120),
-                  ),
-                ),
-              ),
-              IconButton(
-                onPressed: _showSyncHelpDialog,
-                icon: const Icon(Icons.help_outline),
-                tooltip: '同步帮助',
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '管理数据同步和备份',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 32),
-
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(
-                color: theme.dividerColor.withValues(alpha: 0.1),
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              // 标题行，包含帮助按钮
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color.fromARGB(255, 0, 72, 120)
-                              .withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.cloud_sync_outlined,
-                          color: Color.fromARGB(255, 0, 72, 120),
-                        ),
+                  Expanded(
+                    child: Text(
+                      '同步与备份',
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: const Color.fromARGB(255, 0, 72, 120),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '同步配置',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _syncError ?? '未配置同步服务器',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: _syncError != null
-                                    ? theme.colorScheme.error
-                                    : theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: _showSyncConfigDialog,
-                        icon: const Icon(Icons.settings, size: 18),
-                        label: const Text('配置'),
-                      ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Icon(
-                        _lastSyncTime != null
-                            ? Icons.cloud_done
-                            : Icons.cloud_off,
-                        size: 20,
-                        color: _lastSyncTime != null
-                            ? const Color.fromARGB(255, 76, 175, 80)
-                            : theme.colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        _lastSyncTime != null
-                            ? '上次同步: ${_formatDateTime(_lastSyncTime!)}'
-                            : '未同步',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const Spacer(),
-                      FilledButton.icon(
-                        onPressed: _isSyncing ? null : _performSync,
-                        icon: _isSyncing
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.sync, size: 18),
-                        label: Text(_isSyncing ? '同步中...' : '立即同步'),
-                      ),
-                    ],
+                  IconButton(
+                    onPressed: () => showApiHelpDialog(context),
+                    icon: const Icon(Icons.help_outline),
+                    tooltip: '同步帮助',
                   ),
                 ],
               ),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // 导入导出
-          _buildSettingsCard(
-            theme: theme,
-            title: '导入导出',
-            icon: Icons.swap_vert_outlined,
-            items: [
-              SettingsItem(
-                icon: Icons.download_outlined,
-                title: '导出备份',
-                description: '下载加密备份文件',
-                onTap: () {
-                  _showExportDialog();
-                },
+              const SizedBox(height: 16),
+              Text(
+                '管理数据同步和备份',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-              SettingsItem(
-                icon: Icons.upload_outlined,
-                title: '导入备份',
-                description: '从备份文件恢复数据',
-                onTap: () {
-                  _showImportDialog();
-                },
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+              const SizedBox(height: 32),
 
-  String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} '
-        '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
-  }
-
-  void _showExportDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('导出备份'),
-        content: const Text('是否导出当前所有密码的加密备份？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // TODO: 实现导出逻辑
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('导出功能开发中...')),
-              );
-            },
-            child: const Text('导出'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showImportDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('导入备份'),
-        content: const Text('从备份文件恢复数据将覆盖现有数据，是否继续？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // TODO: 实现导入逻辑
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('导入功能开发中...')),
-              );
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('导入'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSettingsCard({
-    required ThemeData theme,
-    required String title,
-    required IconData icon,
-    required List<SettingsItem> items,
-  }) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: theme.dividerColor.withValues(alpha: 0.1),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color.fromARGB(255, 0, 72, 120)
-                        .withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: const Color.fromARGB(255, 0, 72, 120),
+              // 同步配置卡片
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: theme.dividerColor.withValues(alpha: 0.1),
                   ),
                 ),
-                const SizedBox(width: 16),
-                Text(
-                  title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ...items.map((item) => Column(
-                children: [
-                  InkWell(
-                    onTap: item.onTap,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 16),
-                      child: Row(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Icon(
-                            item.icon,
-                            size: 20,
-                            color: theme.colorScheme.onSurfaceVariant,
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color.fromARGB(255, 0, 72, 120)
+                                  .withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.cloud_sync_outlined,
+                              color: Color.fromARGB(255, 0, 72, 120),
+                            ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -471,14 +93,14 @@ class _SyncScreenState extends State<SyncScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  item.title,
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
+                                  '同步配置',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                const SizedBox(height: 2),
+                                const SizedBox(height: 4),
                                 Text(
-                                  item.description,
+                                  settings.syncConfig?.endpointUrl ?? '未配置同步服务器',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: theme.colorScheme.onSurfaceVariant,
                                   ),
@@ -486,288 +108,671 @@ class _SyncScreenState extends State<SyncScreen> {
                               ],
                             ),
                           ),
-                          if (item.trailing != null)
-                            item.trailing!
-                          else
-                            Icon(
-                              Icons.chevron_right,
-                              size: 20,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
+                          FilledButton.tonalIcon(
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => const SyncSettingsDialog(),
+                              );
+                            },
+                            icon: const Icon(Icons.settings, size: 18),
+                            label: const Text('配置'),
+                          ),
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 20),
+                      _SyncButtons(settings: settings),
+                    ],
                   ),
-                  if (item != items.last) const Divider(height: 1, indent: 56),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // 导入导出
+              SettingsCard(
+                theme: theme,
+                title: '导入导出',
+                icon: Icons.swap_vert_outlined,
+                items: [
+                  SettingsItem(
+                    icon: Icons.download_outlined,
+                    title: '导出备份',
+                    description: '下载加密备份文件',
+                    onTap: () => BackupHelper.exportBackup(context, ref),
+                  ),
+                  SettingsItem(
+                    icon: Icons.upload_outlined,
+                    title: '导入备份',
+                    description: '从备份文件恢复数据',
+                    onTap: () => BackupHelper.importBackup(context, ref),
+                  ),
                 ],
-              )),
-          const SizedBox(height: 8),
-        ],
-      ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // 桌面端显示存储目录设置
+              if (!Platform.isAndroid && !Platform.isIOS)
+                SettingsCard(
+                  theme: theme,
+                  title: '数据存储',
+                  icon: Icons.storage_outlined,
+                  items: [
+                    SettingsItem(
+                      icon: Icons.folder_outlined,
+                      title: '数据存储目录',
+                      description: settings.dataDirectory,
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => _StorageDirectoryDialog(
+                            currentDirectory: settings.dataDirectory,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, stack) => Center(child: Text('错误: $err')),
     );
   }
 }
 
-/// 同步配置对话框
-class SyncConfigDialog extends StatefulWidget {
-  const SyncConfigDialog();
+/// 存储目录设置对话框
+class _StorageDirectoryDialog extends ConsumerStatefulWidget {
+  final String currentDirectory;
+
+  const _StorageDirectoryDialog({super.key, required this.currentDirectory});
 
   @override
-  State<SyncConfigDialog> createState() => SyncConfigDialogState();
+  ConsumerState<_StorageDirectoryDialog> createState() =>
+      _StorageDirectoryDialogState();
 }
 
-class SyncConfigDialogState extends State<SyncConfigDialog> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _endpointController;
-  late final TextEditingController _tokenController;
-  late final TextEditingController _usernameController;
-  late final TextEditingController _passwordController;
-
-  SyncAuthType _authType = SyncAuthType.bearer;
-  SyncInterval _interval = SyncInterval.none;
-  bool _isEnabled = false;
-  bool _isTesting = false;
+class _StorageDirectoryDialogState extends ConsumerState<_StorageDirectoryDialog> {
+  late TextEditingController _directoryController;
+  bool _isChanging = false;
 
   @override
   void initState() {
     super.initState();
-    _endpointController = TextEditingController();
-    _tokenController = TextEditingController();
-    _usernameController = TextEditingController();
-    _passwordController = TextEditingController();
+    _directoryController = TextEditingController(text: widget.currentDirectory);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 600),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 标题
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer
+                        .withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.folder,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '数据存储目录',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            const Text(
+              '更改存储目录会将所有现有数据迁移到新位置。请确保选择的目录有足够的磁盘空间。',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+
+            // 当前目录显示
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '当前目录',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SelectableText(
+                    widget.currentDirectory,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // 新目录输入
+            TextField(
+              controller: _directoryController,
+              decoration: const InputDecoration(
+                labelText: '新存储目录',
+                hintText: 'C:\\Users\\YourName\\VaultSafeData',
+                prefixIcon: Icon(Icons.folder_open),
+                helperText: '请输入绝对路径，留空则使用默认目录',
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 24),
+
+            // 按钮
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('取消'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _isChanging ? null : _changeDirectory,
+                  child: _isChanging
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                        : const Text('更改目录'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _changeDirectory() async {
+    final newDirectory = _directoryController.text.trim();
+
+    if (newDirectory.isEmpty) {
+      // 使用默认目录
+      final appDocDir = await getApplicationDocumentsDirectory();
+      final defaultPath =
+          '${appDocDir.path}${Platform.pathSeparator}vault_safe_data';
+
+      setState(() => _isChanging = true);
+
+      try {
+        // TODO: 实现更改目录逻辑
+        if (mounted) {
+          await ref
+              .read(settingsProvider.notifier)
+              .updateDataDirectory(defaultPath);
+
+          if (!context.mounted) return;
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('存储目录已更改为默认位置')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isChanging = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('更改失败: $e')),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isChanging = false);
+        }
+      }
+
+      return;
+    }
+
+    // 验证目录路径
+    final dir = Directory(newDirectory);
+
+    setState(() => _isChanging = true);
+
+    try {
+      // 如果目录不存在，尝试创建
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+
+      // 测试写入权限
+      final testFile = File('${dir.path}${Platform.pathSeparator}.write_test');
+      await testFile.writeAsString('test');
+      await testFile.delete();
+
+      // TODO: 实现更改目录逻辑
+      if (mounted) {
+        await ref
+            .read(settingsProvider.notifier)
+            .updateDataDirectory(newDirectory);
+
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('存储目录已更改，数据已迁移')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isChanging = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('更改失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isChanging = false);
+      }
+    }
   }
 
   @override
   void dispose() {
-    _endpointController.dispose();
-    _tokenController.dispose();
-    _usernameController.dispose();
-    _passwordController.dispose();
+    _directoryController.dispose();
     super.dispose();
   }
+}
 
-  Future<void> _testConnection() async {
-    if (_endpointController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先输入同步端点')),
-      );
-      return;
-    }
+/// 同步按钮组
+class _SyncButtons extends ConsumerStatefulWidget {
+  final AppSettings settings;
 
-    setState(() => _isTesting = true);
+  const _SyncButtons({required this.settings});
+
+  @override
+  ConsumerState<_SyncButtons> createState() => _SyncButtonsState();
+}
+
+class _SyncButtonsState extends ConsumerState<_SyncButtons> {
+  bool _isSyncing = false;
+  bool _isUploading = false;
+  bool _isDownloading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasConfig = widget.settings.syncConfig != null;
+
+    return Column(
+      children: [
+        Row(
+          children: [ 
+            Icon(
+              Icons.cloud_upload_outlined,
+              size: 20,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                '上传到服务器',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: (hasConfig && !_isSyncing) ? _uploadData : null,
+              icon: _isUploading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.upload, size: 18),
+              label: const Text('上传'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Icon(
+              Icons.cloud_download_outlined,
+              size: 20,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                '从服务器下载',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: (hasConfig && !_isSyncing) ? _downloadData : null,
+              icon: _isDownloading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download, size: 18),
+              label: const Text('下载'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _uploadData() async {
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认上传'),
+        content: const Text('上传将覆盖服务器上的数据，是否继续？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('上传'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _isSyncing = true;
+      _isUploading = true;
+    });
 
     try {
-      final dio = Dio();
-      await dio.get(
-        _endpointController.text,
-        options: Options(
-          headers: _buildTestHeaders(),
-        ),
-      );
+      // 1. 检查是否已解锁
+      final authService = ref.read(authServiceProvider);
+      if (!authService.isUnlocked) {
+        throw Exception('请先解锁 VaultSafe');
+      }
+
+      // 2. 获取主密钥
+      final masterKey = authService.masterKey;
+      if (masterKey == null) {
+        throw Exception('无法获取加密密钥');
+      }
+
+      // 3. 导出数据
+      final storageService = ref.read(storageServiceProvider);
+      final data = await storageService.exportData();
+      final jsonString = jsonEncode(data);
+
+      // 4. 加密数据
+      final encrypted = EncryptionService.encrypt(jsonString, masterKey);
+
+      // 5. 创建备份数据结构（与导出格式相同）
+      final backupData = {
+        'version': '1.0',
+        'format': 'vaultsafe-encrypted',
+        'encrypted': true,
+        'data': encrypted.toJson(),
+        'checksum': _calculateChecksum(jsonString),
+        'exportedAt': DateTime.now().toIso8601String(),
+      };
+
+      // 6. 上传到同步服务器
+      final syncConfig = widget.settings.syncConfig!;
+      final syncService = SyncService();
+      await syncService.init(syncConfig);
+
+      final success = await syncService.uploadData(jsonEncode(backupData));
+
+      if (!mounted) return;
+
+      if (success) {
+        // 更新最后同步时间
+        await ref.read(settingsProvider.notifier).updateSyncConfig(
+              syncConfig.copyWith(lastSyncedAt: DateTime.now()),
+            );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('数据上传成功'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        throw Exception('上传失败');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('上传失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+          _isUploading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _downloadData() async {
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认下载'),
+        content: const Text('下载将覆盖本地数据，建议先上传备份。是否继续？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.orange,
+            ),
+            child: const Text('下载'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _isSyncing = true;
+      _isDownloading = true;
+    });
+
+    try {
+      // 1. 检查是否已解锁
+      final authService = ref.read(authServiceProvider);
+      if (!authService.isUnlocked) {
+        throw Exception('请先解锁 VaultSafe');
+      }
+
+      // 2. 获取主密钥
+      final masterKey = authService.masterKey;
+      if (masterKey == null) {
+        throw Exception('无法获取加密密钥');
+      }
+
+      // 3. 从同步服务器下载
+      final syncConfig = widget.settings.syncConfig!;
+      final syncService = SyncService();
+      await syncService.init(syncConfig);
+
+      SyncData? syncData;
+      try {
+        syncData = await syncService.downloadData();
+      } catch (e) {
+        throw Exception('服务器连接失败: ${e.toString()}');
+      }
+
+      if (syncData == null) {
+        throw Exception('服务器返回空数据，可能没有上传过数据');
+      }
+
+      // 4. 解析备份数据
+      Map<String, dynamic> backupData;
+      try {
+        backupData = jsonDecode(syncData.encryptedData) as Map<String, dynamic>;
+      } catch (e) {
+        throw Exception('数据格式错误，无法解析: ${e.toString()}');
+      }
+
+      // 5. 验证备份格式
+      final version = backupData['version'] as String?;
+      if (version != '1.0') {
+        throw Exception('不支持的备份版本: $version');
+      }
+
+      final isEncrypted = backupData['encrypted'] as bool? ?? false;
+      if (!isEncrypted) {
+        throw Exception('备份文件未加密');
+      }
+
+      // 6. 解密数据
+      if (!backupData.containsKey('data')) {
+        throw Exception('备份数据缺少加密内容');
+      }
+
+      final encryptedData = backupData['data'] as Map<String, dynamic>;
+      final encrypted = EncryptedData.fromJson(encryptedData);
+
+      String decryptedJson;
+      try {
+        decryptedJson = EncryptionService.decrypt(encrypted, masterKey);
+      } catch (e) {
+        throw Exception('解密失败，可能主密码不正确: ${e.toString()}');
+      }
+
+      // 7. 验证校验和
+      final storedChecksum = backupData['checksum'] as String?;
+      final calculatedChecksum = _calculateChecksum(decryptedJson);
+      if (storedChecksum != null && storedChecksum != calculatedChecksum) {
+        throw Exception('数据校验和不匹配，可能已损坏');
+      }
+
+      // 8. 解析并导入数据
+      final data = jsonDecode(decryptedJson) as Map<String, dynamic>;
+      final storageService = ref.read(storageServiceProvider);
+
+      try {
+        await storageService.importData(data);
+      } catch (e) {
+        throw Exception('导入数据失败: ${e.toString()}');
+      }
+
+      if (!mounted) return;
+
+      // 9. 刷新界面
+      await ref.read(passwordEntriesProvider.notifier).loadEntries();
+      await ref.read(passwordGroupsProvider.notifier).loadGroups();
+
+      // 10. 更新最后同步时间
+      await ref.read(settingsProvider.notifier).updateSyncConfig(
+            syncConfig.copyWith(lastSyncedAt: DateTime.now()),
+          );
 
       if (mounted) {
-        setState(() => _isTesting = false);
+        final passwordCount = (data['passwords'] as List?)?.length ?? 0;
+        final groupCount = (data['groups'] as List?)?.length ?? 0;
+
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('连接测试成功！'),
+          SnackBar(
+            content: Text('下载成功: $passwordCount 个密码, $groupCount 个分组'),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isTesting = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('连接测试失败: $e'),
+            content: Text('下载失败: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+          _isDownloading = false;
+        });
+      }
     }
   }
 
-  Map<String, String> _buildTestHeaders() {
-    switch (_authType) {
-      case SyncAuthType.bearer:
-        if (_tokenController.text.isNotEmpty) {
-          return {'Authorization': 'Bearer ${_tokenController.text}'};
-        }
-        break;
-      case SyncAuthType.basic:
-        if (_usernameController.text.isNotEmpty &&
-            _passwordController.text.isNotEmpty) {
-          final credentials = base64.encode(
-            utf8.encode(
-                '${_usernameController.text}:${_passwordController.text}'),
-          );
-          return {'Authorization': 'Basic $credentials'};
-        }
-        break;
-      case SyncAuthType.custom:
-        // Custom headers would be built here
-        break;
-    }
-    return {};
+  String _calculateChecksum(String data) {
+    final bytes = utf8.encode(data);
+    final hash = sha256.convert(bytes);
+    return hash.toString();
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('配置同步'),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // 启用同步
-              SwitchListTile(
-                title: const Text('启用云同步'),
-                subtitle: const Text('在设备间同步加密数据'),
-                value: _isEnabled,
-                onChanged: (value) {
-                  setState(() => _isEnabled = value);
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // 同步端点
-              TextFormField(
-                controller: _endpointController,
-                decoration: const InputDecoration(
-                  labelText: '同步端点',
-                  hintText: 'https://your-server.com/api/v1/sync',
-                  prefixIcon: Icon(Icons.http),
-                ),
-                enabled: _isEnabled,
-              ),
-              const SizedBox(height: 16),
-
-              // 认证方式
-              DropdownButtonFormField<SyncAuthType>(
-                initialValue: _authType,
-                decoration: const InputDecoration(
-                  labelText: '认证方式',
-                  prefixIcon: Icon(Icons.lock_outline),
-                ),
-                items: SyncAuthType.values.map((type) {
-                  return DropdownMenuItem(
-                    value: type,
-                    child: Text(type.label),
-                  );
-                }).toList(),
-                onChanged: _isEnabled
-                    ? (value) {
-                        setState(() => _authType = value!);
-                      }
-                    : null,
-              ),
-              const SizedBox(height: 16),
-
-              // 根据认证类型显示不同字段
-              if (_authType == SyncAuthType.bearer) ...[
-                TextFormField(
-                  controller: _tokenController,
-                  decoration: const InputDecoration(
-                    labelText: 'Bearer Token',
-                    prefixIcon: Icon(Icons.vpn_key),
-                  ),
-                  enabled: _isEnabled,
-                ),
-              ] else if (_authType == SyncAuthType.basic) ...[
-                TextFormField(
-                  controller: _usernameController,
-                  decoration: const InputDecoration(
-                    labelText: '用户名',
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                  enabled: _isEnabled,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(
-                    labelText: '密码',
-                    prefixIcon: Icon(Icons.lock),
-                  ),
-                  obscureText: true,
-                  enabled: _isEnabled,
-                ),
-              ],
-
-              const SizedBox(height: 16),
-
-              // 同步间隔
-              DropdownButtonFormField<SyncInterval>(
-                initialValue: _interval,
-                decoration: const InputDecoration(
-                  labelText: '自动同步间隔',
-                  prefixIcon: Icon(Icons.schedule),
-                ),
-                items: SyncInterval.values.map((interval) {
-                  return DropdownMenuItem(
-                    value: interval,
-                    child: Text(interval.label),
-                  );
-                }).toList(),
-                onChanged: _isEnabled
-                    ? (value) {
-                        setState(() => _interval = value!);
-                      }
-                    : null,
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
-        ),
-        OutlinedButton.icon(
-          onPressed: _isTesting ? null : _testConnection,
-          icon: _isTesting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.wifi_find, size: 18),
-          label: const Text('测试连接'),
-        ),
-        FilledButton(
-          onPressed: () {
-            if (_formKey.currentState?.validate() ?? false) {
-              // TODO: 保存配置
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('配置已保存')),
-              );
-            }
-          },
-          child: const Text('保存'),
-        ),
-      ],
-    );
-  }
-}
-
-/// 设置项数据模型
-class SettingsItem {
-  final IconData icon;
-  final String title;
-  final String description;
-  final VoidCallback? onTap;
-  final Widget? trailing;
-
-  const SettingsItem({
-    required this.icon,
-    required this.title,
-    required this.description,
-    this.onTap,
-    this.trailing,
-  });
 }

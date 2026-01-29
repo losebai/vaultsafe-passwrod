@@ -13,7 +13,6 @@ class AuthService {
   static bool _isInitialized = false;
 
   Uint8List? _masterKey;
-  Uint8List? _salt;
 
   Uint8List? get masterKey => _masterKey;
 
@@ -73,7 +72,6 @@ class AuthService {
     );
 
     _masterKey = key;
-    _salt = salt;
   }
 
   /// 校验主密码
@@ -103,7 +101,6 @@ class AuthService {
 
       if (decrypted == 'vaultsafe_verify') {
         _masterKey = key;
-        _salt = salt;
         return true;
       }
 

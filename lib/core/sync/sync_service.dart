@@ -70,11 +70,37 @@ class SyncService {
       if (response.statusCode == 200 && response.data != null) {
         _updateLastSyncTime();
 
+        // 确保 response.data 是 Map 类型
+        if (response.data is! Map) {
+          throw Exception('服务器返回数据格式错误：期望 JSON 对象，实际收到 ${response.data.runtimeType}');
+        }
+
+        final data = response.data as Map;
+
+        // 将整个响应转换为 JSON 字符串（包含完整的备份数据结构）
+        final responseJson = jsonEncode(data);
+
+        // 安全获取元数据字段
+        final dataMap = data['data'] is Map ? data['data'] as Map : null;
+        final nonce = dataMap?['nonce'];
+        final exportedAt = data['exportedAt'];
+        final version = data['version'];
+
+        // 验证必需字段
+        if (nonce == null || version == null || exportedAt == null) {
+          throw Exception('服务器返回数据格式不完整，缺少必需字段');
+        }
+
+        // 验证字段类型
+        if (nonce is! String || version is! String || exportedAt is! String) {
+          throw Exception('服务器返回数据类型错误：nonce/version/exportedAt 必须是字符串');
+        }
+
         return SyncData(
-          deviceId: response.data['device_id'] as String,
-          timestamp: response.data['timestamp'] as int,
-          encryptedData: response.data['encrypted_data'] as String,
-          version: response.data['version'] as String,
+          deviceId: nonce,
+          timestamp: DateTime.parse(exportedAt).millisecondsSinceEpoch ~/ 1000,
+          encryptedData: responseJson, // 存储完整的 JSON 响应
+          version: version,
         );
       }
 

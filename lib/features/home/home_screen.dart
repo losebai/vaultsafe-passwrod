@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultsafe/features/passwords/passwords_screen.dart';
 import 'package:vaultsafe/features/settings/settings_screen.dart';
 import 'package:vaultsafe/features/home/sync_screen.dart';
-import 'package:vaultsafe/features/home/settings_layout.dart';
 import 'package:vaultsafe/shared/providers/log_provider.dart';
 import 'package:vaultsafe/shared/models/log_entry.dart';
 import 'package:vaultsafe/components/NavigationMenu.dart';
@@ -134,7 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // 构建设置内容 - 简化版
   Widget _buildSettingsContent(BuildContext context) {
-    return const SettingsLayout();
+    return const SettingsScreen();
   }
 
   // 构建桌面端侧边栏

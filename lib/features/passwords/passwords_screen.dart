@@ -552,21 +552,41 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
   Widget _buildPasswordCard(PasswordEntry entry, bool isSelected) {
     final theme = Theme.of(context);
 
+    // 桌面端使用 GestureDetector 来支持右键菜单
+    if (_isDesktop) {
+      return GestureDetector(
+        onTap: () {
+          if (_isSelectionMode) {
+            _toggleSelection(entry.id);
+          } else {
+            _openPasswordDetail(entry);
+          }
+        },
+        onLongPress: () {
+          if (!_isSelectionMode) {
+            _toggleSelectionMode();
+            _toggleSelection(entry.id);
+          }
+        },
+        onSecondaryTap: () {
+          // 右键点击显示菜单
+          _showContextMenu(context, entry);
+        },
+        child: _buildPasswordCardContent(entry, isSelected, theme),
+      );
+    }
+
+    // 移动端保持原有逻辑
     return InkWell(
       onTap: () {
         if (_isSelectionMode) {
           _toggleSelection(entry.id);
         } else {
-          // 桌面端打开右侧面板，移动端跳转详情页
-          if (_isDesktop) {
-            _openPasswordDetail(entry);
-          } else {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => PasswordDetailScreen(entry: entry),
-              ),
-            );
-          }
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => PasswordDetailScreen(entry: entry),
+            ),
+          );
         }
       },
       onLongPress: () {
@@ -576,7 +596,13 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
         }
       },
       borderRadius: BorderRadius.circular(16),
-      child: Container(
+      child: _buildPasswordCardContent(entry, isSelected, theme),
+    );
+  }
+
+  // 密码卡片内容
+  Widget _buildPasswordCardContent(PasswordEntry entry, bool isSelected, ThemeData theme) {
+    return Container(
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
@@ -712,7 +738,6 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
           ],
         ),
       ),
-    )
     );
   }
 
@@ -998,6 +1023,156 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
         ],
       ),
     );
+  }
+
+  // 显示右键菜单
+  void _showContextMenu(BuildContext context, PasswordEntry entry) async {
+    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final result = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromPoints(
+          // 获取鼠标点击位置 (使用手势检测器获取)
+          // 这里使用默认位置，因为onSecondaryTap没有提供位置信息
+          Offset.zero,
+          Offset.zero,
+        ),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem<String>(
+          value: 'copy_username',
+          child: Row(
+            children: const [
+              Icon(Icons.person_outline, size: 18),
+              SizedBox(width: 12),
+              Text('复制用户名'),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'copy_password',
+          child: Row(
+            children: const [
+              Icon(Icons.password, size: 18),
+              SizedBox(width: 12),
+              Text('复制密码'),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem<String>(
+          value: 'edit',
+          child: Row(
+            children: const [
+              Icon(Icons.edit_outlined, size: 18),
+              SizedBox(width: 12),
+              Text('编辑'),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'delete',
+          child: Row(
+            children: const [
+              Icon(Icons.delete_outline, size: 18, color: Colors.red),
+              SizedBox(width: 12),
+              Text('删除', style: TextStyle(color: Colors.red)),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    if (result != null) {
+      switch (result) {
+        case 'copy_username':
+          await _copyUsername(entry);
+          break;
+        case 'copy_password':
+          await _copyPassword(entry);
+          break;
+        case 'edit':
+          _openPasswordDetail(entry);
+          break;
+        case 'delete':
+          await _deleteEntry(entry);
+          break;
+      }
+    }
+  }
+
+  // 复制用户名
+  Future<void> _copyUsername(PasswordEntry entry) async {
+    await Clipboard.setData(ClipboardData(text: entry.username));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已复制用户名: ${entry.username}')),
+      );
+    }
+  }
+
+  // 复制密码
+  Future<void> _copyPassword(PasswordEntry entry) async {
+    try {
+      final authService = ref.read(authServiceProvider);
+      final masterKey = authService.masterKey;
+      if (masterKey == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('密码库已锁定')),
+          );
+        }
+        return;
+      }
+
+      final decrypted = EncryptionService.decrypt(entry.encryptedPassword, masterKey);
+      await Clipboard.setData(ClipboardData(text: decrypted));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已复制密码到剪贴板')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('解密失败: $e')),
+        );
+      }
+    }
+  }
+
+  // 删除单个密码条目
+  Future<void> _deleteEntry(PasswordEntry entry) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认删除'),
+        content: Text('确定要删除 "${entry.title}" 吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await ref.read(passwordEntriesProvider.notifier).deleteEntry(entry.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已删除: ${entry.title}')),
+        );
+      }
+    }
   }
 
   void _showSearch() {
