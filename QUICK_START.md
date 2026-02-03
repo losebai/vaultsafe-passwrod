@@ -26,36 +26,108 @@ python sync_server.py
 ╔══════════════════════════════════════════════════════════╗
 ║            VaultSafe 同步服务器                          ║
 ║                                                            ║
-║  一个简单的 Flask 服务器，用于存储加密的密码备份        ║
+║  多配置支持 - 不同配置名称对应不同的数据文件            ║
 ║                                                            ║
 ╚══════════════════════════════════════════════════════════╝
 
-📁 数据文件: D:\vaultsafe_sync.json
-🌐 服务地址: http://localhost:5000/sync
+📁 数据目录: D:\vaultsafe_sync_data
+🌐 同步端点: http://localhost:5000/sync/<配置名>
+   示例: http://localhost:5000/sync/default
+        http://localhost:5000/sync/work
+        http://localhost:5000/sync/personal
 📊 状态查询: http://localhost:5000/status
-⚠️  警告: 未启用认证，任何人都可以访问数据！
+🗑️  清除配置: POST http://localhost:5000/clear/<配置名>
 
 启动服务器...
  * Running on http://0.0.0.0:5000
 ```
 
-## 三、在 VaultSafe 中配置
+## 三、多配置功能
+
+### 什么是多配置？
+服务器支持多个独立的配置文件，每个配置对应不同的数据文件：
+- `default` → `sync_data/default.json`
+- `work` → `sync_data/work.json`
+- `personal` → `sync_data/personal.json`
+
+### 使用场景
+- **工作/个人分离**：工作密码和个人密码分开存储
+- **多设备分离**：不同设备使用不同的配置文件
+- **测试环境**：测试数据不影响生产数据
+
+## 四、在 VaultSafe 中配置
 
 1. 打开 VaultSafe
 2. 进入「同步」标签页
 3. 点击「配置」按钮
-4. 填写服务器地址：
-   ```
-   http://localhost:5000/sync
-   ```
-5. 选择认证方式：
-   - **无认证**：直接点击「测试连接」
-   - **Bearer Token**：输入Token后测试
-   - **Basic Auth**：输入用户名和密码后测试
-6. 保存配置
-7. 点击「上传」上传数据
+4. 填写服务器地址，格式：**`http://localhost:5000/sync/配置名`**
+   - 默认配置：`http://localhost:5000/sync/default`
+   - 工作配置：`http://localhost:5000/sync/work`
+   - 个人配置：`http://localhost:5000/sync/personal`
+5. 选择认证方式（如果设置了）
+6. 点击「测试连接」
+7. 保存配置
+8. 点击「上传」上传数据
 
-## 四、添加认证（推荐）
+### 添加多个同步配置
+
+您可以在 VaultSafe 中添加多个同步配置：
+
+1. 点击「配置」→「添加同步配置」
+2. 为每个配置填写不同的服务器地址：
+   - 配置1：`http://localhost:5000/sync/default`
+   - 配置2：`http://localhost:5000/sync/work`
+   - 配置3：`http://localhost:5000/sync/personal`
+
+每个配置可以使用不同的主密码加密！
+
+## 五、查看服务器状态
+
+访问状态页面查看所有配置：
+```
+http://localhost:5000/status
+```
+
+返回示例：
+```json
+{
+  "status": "running",
+  "data_dir": "/path/to/sync_data",
+  "total_configs": 3,
+  "configs": [
+    {
+      "name": "default",
+      "last_updated": "2024-01-01T12:00:00.000Z",
+      "has_data": true,
+      "devices": ["device-1", "device-2"]
+    },
+    {
+      "name": "work",
+      "last_updated": "2024-01-01T10:00:00.000Z",
+      "has_data": true,
+      "devices": ["device-3"]
+    },
+    {
+      "name": "personal",
+      "last_updated": "2024-01-01T08:00:00.000Z",
+      "has_data": true,
+      "devices": ["device-1"]
+    }
+  ]
+}
+```
+
+## 六、API 端点
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/sync/<配置名>` | POST | 上传数据到指定配置 |
+| `/sync/<配置名>` | GET | 从指定配置下载数据 |
+| `/status` | GET | 查看所有配置状态 |
+| `/clear/<配置名>` | POST | 清除指定配置 |
+| `/clear` | POST | 清除所有配置 |
+
+## 七、添加认证（推荐）
 
 ### Windows - 修改 start_server.bat
 编辑 `start_server.bat`，找到配置区域：
@@ -70,13 +142,20 @@ export VAULTSAFE_API_TOKEN="your-secret-token-here"
 python sync_server.py
 ```
 
-## 五、数据文件
+### 配置自定义数据目录
+```bash
+export VAULTSAFE_DATA_DIR="/path/to/data"
+python sync_server.py
+```
 
-同步数据保存在当前目录的 `vaultsafe_sync.json` 文件中。
+## 八、数据文件结构
 
-**数据格式示例：**
+数据保存在 `sync_data` 目录中，每个配置对应一个 JSON 文件：
+
+**sync_data/default.json:**
 ```json
 {
+  "config_name": "default",
   "data": {
     "nonce": "device-id",
     "encrypted": true,
@@ -94,16 +173,41 @@ python sync_server.py
 }
 ```
 
-## 六、API 端点
+## 九、测试服务器
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/sync` | POST | 上传数据 |
-| `/sync` | GET | 下载数据 |
-| `/status` | GET | 查看状态 |
-| `/clear` | POST | 清除数据 |
+运行测试脚本验证功能：
+```bash
+python test_server.py
+```
 
-## 七、故障排除
+测试脚本会：
+1. 检查服务器状态
+2. 测试数据上传
+3. 测试数据下载
+4. 测试多配置功能
+
+## 十、配置名称规则
+
+配置名称只能包含：
+- 字母（a-z, A-Z）
+- 数字（0-9）
+- 下划线（_）
+- 连字符（-）
+
+有效示例：
+- ✅ `default`
+- ✅ `work`
+- ✅ `personal`
+- ✅ `my_config_1`
+- ✅ `test-2024`
+
+无效示例：
+- ❌ `../etc/passwd`（路径遍历攻击）
+- ❌ `config.json`（包含后缀）
+- ❌ `my config`（包含空格）
+- ❌ `config/backup`（包含路径）
+
+## 十一、故障排除
 
 ### 端口被占用
 修改 `start_server.bat` 中的端口：
@@ -111,11 +215,10 @@ python sync_server.py
 set PORT=8080
 ```
 
+### 配置名称无效
+确保配置名称只包含字母、数字、下划线和连字符。
+
 ### 连接被拒绝
 1. 检查服务器是否正在运行
 2. 检查防火墙设置
-3. 确认端口号正确
-
-### 认证失败
-1. 确认 Token/用户名密码正确
-2. 检查 VaultSafe 中的认证方式设置
+3. 确认端口号和配置名称正确
