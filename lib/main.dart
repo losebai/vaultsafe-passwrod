@@ -9,11 +9,19 @@ import 'package:vaultsafe/core/storage/storage_service.dart';
 import 'package:vaultsafe/core/logging/log_service.dart';
 import 'package:vaultsafe/core/update/auto_update_manager.dart';
 import 'package:vaultsafe/core/config/app_config.dart';
+import 'package:vaultsafe/core/security/auto_lock_service.dart';
 import 'package:vaultsafe/features/auth/auth_service.dart';
 import 'package:vaultsafe/features/auth/auth_screen.dart';
+import 'package:vaultsafe/features/home/home_screen.dart';
 import 'package:vaultsafe/shared/providers/password_provider.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
 import 'package:vaultsafe/shared/providers/settings_provider.dart';
+
+/// 导航路由名称
+class RouteNames {
+  static const String auth = '/auth';
+  static const String home = '/home';
+}
 
 /// 从安全存储获取数据目录
 /// 如果没有设置，返回 null（将使用默认目录）
@@ -116,7 +124,12 @@ class _VaultSafeAppState extends ConsumerState<VaultSafeApp> {
       ),
       darkTheme: _buildDarkTheme(),
       themeMode: ThemeMode.system,
-      home: const AuthScreen(),
+      // 使用命名路由
+      routes: {
+        RouteNames.auth: (context) => const AuthScreen(),
+        RouteNames.home: (context) => const AutoLockWrapper(child: HomeScreen()),
+      },
+      initialRoute: RouteNames.auth,
     );
   }
 

@@ -28,6 +28,7 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
   bool _isRightPanelOpen = false;
   PasswordEntry? _selectedEntry; // 当前选中的密码条目
   bool _isEditMode = false; // 是否为编辑模式
+  Offset? _lastRightClickPosition; // 存储右键点击位置
 
   // 检测是否为桌面平台
   bool get _isDesktop => Platform.isWindows || Platform.isMacOS || Platform.isLinux;
@@ -568,7 +569,9 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
             _toggleSelection(entry.id);
           }
         },
-        onSecondaryTap: () {
+        onSecondaryTapDown: (details) {
+          // 存储右键点击位置
+          _lastRightClickPosition = details.globalPosition;
           // 右键点击显示菜单
           _showContextMenu(context, entry);
         },
@@ -1028,15 +1031,14 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
   // 显示右键菜单
   void _showContextMenu(BuildContext context, PasswordEntry entry) async {
     final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+
+    // 使用存储的右键点击位置，如果没有则默认为屏幕中心
+    final position = _lastRightClickPosition ?? Offset.zero;
+
     final result = await showMenu<String>(
       context: context,
       position: RelativeRect.fromRect(
-        Rect.fromPoints(
-          // 获取鼠标点击位置 (使用手势检测器获取)
-          // 这里使用默认位置，因为onSecondaryTap没有提供位置信息
-          Offset.zero,
-          Offset.zero,
-        ),
+        Rect.fromPoints(position, position),
         Offset.zero & overlay.size,
       ),
       items: [

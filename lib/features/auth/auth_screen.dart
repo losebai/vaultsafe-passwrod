@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultsafe/features/auth/setup_password_screen.dart';
-import 'package:vaultsafe/features/home/home_screen.dart';
+import 'package:vaultsafe/main.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
 
 
@@ -77,9 +77,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   void _navigateToHome() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-    );
+    Navigator.of(context).pushReplacementNamed(RouteNames.home);
   }
 
   @override
