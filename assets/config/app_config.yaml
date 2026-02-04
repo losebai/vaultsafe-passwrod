@@ -9,8 +9,9 @@ app:
 
 # API 配置
 api:
-  # 更新服务器
-  update_server: "https://api.yourserver.com/v1/update"
+  # 更新服务器（替换为你的实际更新服务器地址）
+  # 如果不需要在线更新功能，可以保持为空或设置为禁用
+  update_server: ""  # 例如: "https://your-server.com/api/update"
 
   # 同步服务器默认配置
   sync:
@@ -114,7 +115,7 @@ ui:
 auto_update:
   # 检查更新间隔（小时）
   check_interval: 24
-
+ 
   # 是否启用自动更新
   enabled: true
 

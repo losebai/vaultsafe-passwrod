@@ -11,6 +11,7 @@ import 'package:vaultsafe/shared/models/password_group.dart';
 import 'package:vaultsafe/core/encryption/encryption_service.dart';
 import 'package:vaultsafe/shared/utils/password_generator.dart';
 import 'package:vaultsafe/features/passwords/password_detail_screen.dart';
+import 'package:vaultsafe/core/security/password_verification_service.dart';
 
 /// 密码列表界面
 class PasswordsScreen extends ConsumerStatefulWidget {
@@ -347,11 +348,7 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                         if (_selectedEntry != null && !_isEditMode)
                           IconButton(
                             icon: const Icon(Icons.edit),
-                            onPressed: () {
-                              setState(() {
-                                _isEditMode = true;
-                              });
-                            },
+                            onPressed: () => _startEditMode(),
                             tooltip: '编辑',
                           ),
                         if (_isEditMode)
@@ -432,6 +429,24 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
       _selectedEntry = entry;
       _isRightPanelOpen = true;
       _clearSelection();
+    });
+  }
+
+  // 开始编辑模式（需要验证）
+  Future<void> _startEditMode() async {
+    // 验证主密码
+    final verified = await requestPasswordVerification(
+      context,
+      ref,
+      reason: '编辑密码',
+    );
+
+    if (!verified || !mounted) {
+      return; // 验证失败或取消
+    }
+
+    setState(() {
+      _isEditMode = true;
     });
   }
 
@@ -1116,6 +1131,17 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
 
   // 复制密码
   Future<void> _copyPassword(PasswordEntry entry) async {
+    // 验证主密码
+    final verified = await requestPasswordVerification(
+      context,
+      ref,
+      reason: '复制密码',
+    );
+
+    if (!verified) {
+      return; // 验证失败或取消
+    }
+
     try {
       final authService = ref.read(authServiceProvider);
       final masterKey = authService.masterKey;

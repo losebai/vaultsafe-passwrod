@@ -276,6 +276,9 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
       case UpdateStatus.error:
         return _buildErrorCard(state, theme);
 
+      case UpdateStatus.cancelled:
+        return _buildCancelledCard(theme);
+
       default:
         return const SizedBox.shrink();
     }
@@ -541,6 +544,39 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCancelledCard(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.cancel,
+            size: 64,
+            color: Colors.orange,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '下载已取消',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('关闭'),
           ),
         ],
       ),

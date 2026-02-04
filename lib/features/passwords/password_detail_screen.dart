@@ -8,6 +8,7 @@ import 'package:vaultsafe/shared/providers/auth_provider.dart';
 import 'package:vaultsafe/shared/providers/password_provider.dart';
 import 'package:vaultsafe/shared/platform/platform_service.dart';
 import 'package:vaultsafe/core/logging/log_service.dart';
+import 'package:vaultsafe/core/security/password_verification_service.dart';
 
 /// 密码详情界面 - 显示和复制密码
 class PasswordDetailScreen extends ConsumerStatefulWidget {
@@ -55,7 +56,7 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: () => _editPassword(context),
+            onPressed: () => _editPassword(),
           ),
           IconButton(
             icon: const Icon(Icons.delete),
@@ -103,16 +104,12 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
                 children: [
                   IconButton(
                     icon: Icon(_passwordVisible ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () {
-                      setState(() {
-                        _passwordVisible = !_passwordVisible;
-                      });
-                    },
+                    onPressed: () => _togglePasswordVisibility(),
                   ),
                   IconButton(
                     icon: const Icon(Icons.copy),
                     onPressed: _decryptedPassword != null
-                        ? () => _copyToClipboard(_decryptedPassword!, '密码')
+                        ? () => _copyPassword()
                         : null,
                   ),
                 ],
@@ -227,7 +224,59 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
     });
   }
 
-  void _editPassword(BuildContext context) {
+  /// 切换密码可见性（需要验证）
+  Future<void> _togglePasswordVisibility() async {
+    // 如果要显示密码，需要验证
+    if (!_passwordVisible) {
+      final verified = await requestPasswordVerification(
+        context,
+        ref,
+        reason: '查看密码',
+      );
+
+      if (!verified) {
+        return; // 验证失败或取消
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _passwordVisible = !_passwordVisible;
+      });
+    }
+  }
+
+  /// 复制密码（需要验证）
+  Future<void> _copyPassword() async {
+    // 验证主密码
+    final verified = await requestPasswordVerification(
+      context,
+      ref,
+      reason: '复制密码',
+    );
+
+    if (!verified) {
+      return; // 验证失败或取消
+    }
+
+    if (_decryptedPassword != null && mounted) {
+      await _copyToClipboard(_decryptedPassword!, '密码');
+    }
+  }
+
+  /// 编辑密码（需要验证）
+  Future<void> _editPassword() async {
+    // 验证主密码
+    final verified = await requestPasswordVerification(
+      context,
+      ref,
+      reason: '编辑密码',
+    );
+
+    if (!verified || !mounted) {
+      return; // 验证失败或取消
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => AddPasswordScreen(entry: widget.entry),

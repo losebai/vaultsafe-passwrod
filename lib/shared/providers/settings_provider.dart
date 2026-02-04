@@ -33,6 +33,7 @@ class SettingsNotifier extends StateNotifier<AsyncValue<AppSettings>> {
       // 从安全存储加载设置
       final biometricEnabled = await _storage.read(key: 'biometric_enabled') == 'true';
       final autoLockSeconds = int.tryParse(await _storage.read(key: 'auto_lock_timeout') ?? '60') ?? 60;
+      final passwordVerificationSeconds = int.tryParse(await _storage.read(key: 'password_verification_timeout') ?? '30') ?? 30;
       final syncEnabled = await _storage.read(key: 'sync_enabled') == 'true';
 
       // 加载同步配置
@@ -74,6 +75,7 @@ class SettingsNotifier extends StateNotifier<AsyncValue<AppSettings>> {
       final settings = AppSettings(
         biometricEnabled: biometricEnabled,
         autoLockTimeout: Duration(seconds: autoLockSeconds),
+        passwordVerificationTimeout: Duration(seconds: passwordVerificationSeconds),
         syncEnabled: syncEnabled,
         syncConfig: syncConfig,
         dataDirectory: dataDirectory,
@@ -133,6 +135,13 @@ class SettingsNotifier extends StateNotifier<AsyncValue<AppSettings>> {
     await _storage.write(key: 'auto_update_enabled', value: value.toString());
     state.whenData((settings) {
       state = AsyncValue.data(settings.copyWith(autoUpdateEnabled: value));
+    });
+  }
+
+  Future<void> updatePasswordVerificationTimeout(Duration timeout) async {
+    await _storage.write(key: 'password_verification_timeout', value: timeout.inSeconds.toString());
+    state.whenData((settings) {
+      state = AsyncValue.data(settings.copyWith(passwordVerificationTimeout: timeout));
     });
   }
 

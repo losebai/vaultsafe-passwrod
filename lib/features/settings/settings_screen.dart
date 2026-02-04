@@ -58,6 +58,13 @@ class SettingsScreen extends ConsumerWidget {
                           context, ref, settings.autoLockTimeout),
                     ),
                     _SettingsItem(
+                      icon: Icons.verified_user_outlined,
+                      title: '密码验证超时',
+                      description: _formatTimeout(settings.passwordVerificationTimeout),
+                      onTap: () => _showPasswordVerificationTimeoutDialog(
+                          context, ref, settings.passwordVerificationTimeout),
+                    ),
+                    _SettingsItem(
                       icon: Icons.fingerprint,
                       title: '生物识别解锁',
                       description: settings.biometricEnabled ? '已启用' : '已禁用',
@@ -345,6 +352,15 @@ class SettingsScreen extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => _TimeoutDialog(current: current),
+    );
+  }
+
+  // 显示密码验证超时时间选择弹窗
+  void _showPasswordVerificationTimeoutDialog(
+      BuildContext context, WidgetRef ref, Duration current) {
+    showDialog(
+      context: context,
+      builder: (context) => _PasswordVerificationTimeoutDialog(current: current),
     );
   }
 
@@ -661,6 +677,114 @@ class _TimeoutDialog extends ConsumerWidget {
   }
 
   String _formatTimeout(Duration timeout) {
+    if (timeout.inMinutes >= 1) {
+      return '${timeout.inMinutes} 分钟';
+    }
+    return '${timeout.inSeconds} 秒';
+  }
+}
+
+/// 密码验证超时时间选择弹窗
+class _PasswordVerificationTimeoutDialog extends ConsumerWidget {
+  final Duration current;
+
+  const _PasswordVerificationTimeoutDialog({required this.current});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final timeouts = [
+      const Duration(seconds: 10),
+      const Duration(seconds: 30),
+      const Duration(minutes: 1),
+      const Duration(minutes: 5),
+      const Duration(minutes: 15),
+    ];
+
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 400),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 标题
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer
+                        .withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.verified_user,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '密码验证超时',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '查看、复制或编辑密码时需要验证主密码，验证成功后在此时间内无需重复验证',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // 选项列表
+            ...timeouts.map((timeout) {
+              return ListTile(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                leading: Radio<Duration>(
+                  value: timeout,
+                  groupValue: current,
+                  onChanged: (value) {
+                    if (value != null) {
+                      ref
+                          .read(settingsProvider.notifier)
+                          .updatePasswordVerificationTimeout(value);
+                      Navigator.of(context).pop();
+                    }
+                  },
+                ),
+                title: Text(_formatDuration(timeout)),
+                onTap: () {
+                  ref
+                      .read(settingsProvider.notifier)
+                      .updatePasswordVerificationTimeout(timeout);
+                  Navigator.of(context).pop();
+                },
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDuration(Duration timeout) {
     if (timeout.inMinutes >= 1) {
       return '${timeout.inMinutes} 分钟';
     }

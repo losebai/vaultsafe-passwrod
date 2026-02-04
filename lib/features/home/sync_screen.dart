@@ -561,7 +561,7 @@ class _SyncButtonsState extends ConsumerState<_SyncButtons> {
 
     // 如果使用自定义密码，弹出输入对话框
     Uint8List? masterKey;
-    String? customPasswordHint;
+    String? saltHex; // 保存salt用于上传
 
     if (useCustomPassword == true) {
       final customPassword = await showMasterPasswordDialog(
@@ -578,8 +578,8 @@ class _SyncButtonsState extends ConsumerState<_SyncButtons> {
 
       // 使用自定义密码派生密钥
       const storage = FlutterSecureStorage();
-      final salt = await storage.read(key: 'master_salt');
-      if (salt == null) {
+      saltHex = await storage.read(key: 'master_salt');
+      if (saltHex == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -592,10 +592,9 @@ class _SyncButtonsState extends ConsumerState<_SyncButtons> {
       }
 
       final saltBytes = Uint8List.fromList(
-        List.generate(salt.length ~/ 2, (i) => int.parse(salt.substring(i * 2, i * 2 + 2), radix: 16)),
+        List.generate(saltHex!.length ~/ 2, (i) => int.parse(saltHex!.substring(i * 2, i * 2 + 2), radix: 16)),
       );
       masterKey = EncryptionService.deriveKey(customPassword, saltBytes);
-      customPasswordHint = ' (使用自定义密码加密)';
     } else {
       // 使用当前主密码
       final authService = ref.read(authServiceProvider);
@@ -623,6 +622,10 @@ class _SyncButtonsState extends ConsumerState<_SyncButtons> {
         }
         return;
       }
+
+      // 读取salt用于上传
+      const storage = FlutterSecureStorage();
+      saltHex = await storage.read(key: 'master_salt');
     }
 
     // 确认上传
@@ -666,6 +669,7 @@ class _SyncButtonsState extends ConsumerState<_SyncButtons> {
         'format': 'vaultsafe-encrypted',
         'encrypted': true,
         'data': encrypted.toJson(),
+        'salt': saltHex, // 包含salt用于跨设备解密
         'checksum': _calculateChecksum(jsonString),
         'exportedAt': DateTime.now().toIso8601String(),
       };
@@ -687,8 +691,8 @@ class _SyncButtonsState extends ConsumerState<_SyncButtons> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('数据上传成功$customPasswordHint'),
+            const SnackBar(
+              content: Text('数据上传成功'),
               backgroundColor: Colors.green,
             ),
           );
@@ -785,6 +789,9 @@ class _SyncButtonsState extends ConsumerState<_SyncButtons> {
         throw Exception('备份数据缺少加密内容');
       }
 
+      // 获取备份中的 salt（用于跨设备解密）
+      final backupSalt = backupData['salt'] as String?;
+
       final encryptedData = backupData['data'] as Map<String, dynamic>;
       final encrypted = EncryptedData.fromJson(encryptedData);
 
@@ -792,15 +799,48 @@ class _SyncButtonsState extends ConsumerState<_SyncButtons> {
       String decryptedJson;
       bool useCustomPassword = false;
 
-      // 首先尝试使用当前主密码
-      final authService = ref.read(authServiceProvider);
-      Uint8List? masterKey = authService.masterKey;
+      // 如果备份中有 salt，使用备份的 salt（跨设备同步）
+      if (backupSalt != null) {
+        final decrypted = await _decryptWithBackupSalt(encrypted, backupSalt, backupData);
+        if (decrypted == null || !mounted) {
+          setState(() {
+            _isSyncing = false;
+            _isDownloading = false;
+          });
+          return;
+        }
+        decryptedJson = decrypted;
+      } else {
+        // 旧版本备份没有 salt，使用本地方式
+        final authService = ref.read(authServiceProvider);
+        Uint8List? masterKey = authService.masterKey;
 
-      if (masterKey != null) {
-        try {
-          decryptedJson = EncryptionService.decrypt(encrypted, masterKey);
-        } catch (e) {
-          // 当前主密码解密失败，尝试让用户输入自定义密码
+        if (masterKey != null) {
+          try {
+            decryptedJson = EncryptionService.decrypt(encrypted, masterKey);
+          } catch (e) {
+            // 当前主密码解密失败，尝试让用户输入自定义密码
+            if (!mounted) {
+              setState(() {
+                _isSyncing = false;
+                _isDownloading = false;
+              });
+              return;
+            }
+
+            final customDecrypted = await _decryptWithCustomPassword(encrypted, backupData);
+            if (customDecrypted == null || !mounted) {
+              setState(() {
+                _isSyncing = false;
+                _isDownloading = false;
+              });
+              return;
+            }
+            decryptedJson = customDecrypted;
+            useCustomPassword = true;
+          }
+        } else {
+          // 没有当前主密钥，直接要求输入
           if (!mounted) {
             setState(() {
               _isSyncing = false;
@@ -820,26 +860,6 @@ class _SyncButtonsState extends ConsumerState<_SyncButtons> {
           decryptedJson = customDecrypted;
           useCustomPassword = true;
         }
-      } else {
-        // 没有当前主密钥，直接要求输入
-        if (!mounted) {
-          setState(() {
-            _isSyncing = false;
-            _isDownloading = false;
-          });
-          return;
-        }
-
-        final customDecrypted = await _decryptWithCustomPassword(encrypted, backupData);
-        if (customDecrypted == null || !mounted) {
-          setState(() {
-            _isSyncing = false;
-            _isDownloading = false;
-          });
-          return;
-        }
-        decryptedJson = customDecrypted;
-        useCustomPassword = true;
       }
 
       // 5. 验证校验和
@@ -949,5 +969,47 @@ class _SyncButtonsState extends ConsumerState<_SyncButtons> {
     // 使用自定义密码解密
     final customKey = EncryptionService.deriveKey(customPassword, saltBytes);
     return EncryptionService.decrypt(encrypted, customKey);
+  }
+
+  /// 使用备份中的 salt 解密数据（跨设备同步）
+  Future<String?> _decryptWithBackupSalt(
+    EncryptedData encrypted,
+    String backupSalt,
+    Map<String, dynamic> backupData,
+  ) async {
+    // 将备份的 salt 转换为字节数组
+    final saltBytes = Uint8List.fromList(
+      List.generate(backupSalt.length ~/ 2, (i) => int.parse(backupSalt.substring(i * 2, i * 2 + 2), radix: 16)),
+    );
+
+    // 显示对话框让用户输入主密码
+    final masterPassword = await showMasterPasswordDialog(
+      context,
+      title: '输入主密码',
+      hintText: '请输入主密码以解密备份数据',
+      onVerify: (password) {
+        try {
+          // 使用备份中的 salt 派生密钥
+          final testKey = EncryptionService.deriveKey(password, saltBytes);
+          final testDecrypted = EncryptionService.decrypt(encrypted, testKey);
+
+          // 验证校验和
+          final storedChecksum = backupData['checksum'] as String?;
+          if (storedChecksum != null) {
+            final calculatedChecksum = _calculateChecksum(testDecrypted);
+            return storedChecksum == calculatedChecksum;
+          }
+          return true;
+        } catch (e) {
+          return false;
+        }
+      },
+    );
+
+    if (masterPassword == null) return null;
+
+    // 使用主密码和备份的 salt 解密
+    final backupKey = EncryptionService.deriveKey(masterPassword, saltBytes);
+    return EncryptionService.decrypt(encrypted, backupKey);
   }
 }

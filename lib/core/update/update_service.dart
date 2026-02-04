@@ -21,6 +21,16 @@ class UpdateService {
   /// 检查更新
   Future<UpdateCheckResult> checkUpdate({bool? includeDataUpdates}) async {
     try {
+      // 检查更新服务器是否配置
+      if (updateUrl.isEmpty) {
+        log.i('更新服务器未配置，跳过更新检查', source: 'UpdateService');
+        final packageInfo = await PackageInfo.fromPlatform();
+        return UpdateCheckResult(
+          hasUpdate: false,
+          currentVersion: AppVersion.fromString(packageInfo.version),
+        );
+      }
+
       log.i('开始检查更新...', source: 'UpdateService');
 
       final packageInfo = await PackageInfo.fromPlatform();
