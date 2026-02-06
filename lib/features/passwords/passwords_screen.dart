@@ -11,6 +11,7 @@ import 'package:vaultsafe/shared/models/password_group.dart';
 import 'package:vaultsafe/core/encryption/encryption_service.dart';
 import 'package:vaultsafe/shared/utils/password_generator.dart';
 import 'package:vaultsafe/features/passwords/password_detail_screen.dart';
+import 'package:vaultsafe/features/passwords/add_password_screen.dart';
 import 'package:vaultsafe/core/security/password_verification_service.dart';
 
 /// 密码列表界面
@@ -345,12 +346,6 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                           ),
                         ),
                         const Spacer(),
-                        if (_selectedEntry != null && !_isEditMode)
-                          IconButton(
-                            icon: const Icon(Icons.edit),
-                            onPressed: () => _startEditMode(),
-                            tooltip: '编辑',
-                          ),
                         if (_isEditMode)
                           IconButton(
                             icon: const Icon(Icons.close),
@@ -371,39 +366,26 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                   ),
                   // 面板内容
                   Expanded(
-                    child: _isEditMode
+                    child: _selectedEntry != null
                         ? _EditPasswordForm(
                             entry: _selectedEntry!,
                             onSave: () async {
                               // 等待 provider 完成数据刷新
                               await ref.read(passwordEntriesProvider.notifier).loadEntries();
-                              // 从更新后的列表中获取最新的 entry
-                              ref.read(passwordEntriesProvider).whenData((entries) {
-                                final updatedEntry = entries.firstWhere(
-                                  (e) => e.id == _selectedEntry!.id,
-                                  orElse: () => _selectedEntry!,
-                                );
-                                if (mounted) {
-                                  setState(() {
-                                    _selectedEntry = updatedEntry;
-                                    _isEditMode = false;
-                                  });
-                                }
-                              });
+                              // 关闭右侧面板
+                              if (mounted) {
+                                _closeRightPanel();
+                              }
                             },
                             onCancel: () {
-                              setState(() {
-                                _isEditMode = false;
-                              });
+                              _closeRightPanel();
                             },
                           )
-                        : _selectedEntry != null
-                            ? _PasswordDetailPanel(entry: _selectedEntry!)
-                            : _AddPasswordForm(
-                                onSave: () {
-                                  _closeRightPanel();
-                                },
-                              ),
+                        : _AddPasswordForm(
+                            onSave: () {
+                              _closeRightPanel();
+                            },
+                          ),
                           ),
                 ],
               ),
@@ -423,17 +405,8 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
     });
   }
 
-  // 打开密码详情
-  void _openPasswordDetail(PasswordEntry entry) {
-    setState(() {
-      _selectedEntry = entry;
-      _isRightPanelOpen = true;
-      _clearSelection();
-    });
-  }
-
-  // 开始编辑模式（需要验证）
-  Future<void> _startEditMode() async {
+  // 打开密码编辑（需要验证）
+  Future<void> _openPasswordEdit(PasswordEntry entry) async {
     // 验证主密码
     final verified = await requestPasswordVerification(
       context,
@@ -446,7 +419,10 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
     }
 
     setState(() {
+      _selectedEntry = entry;
       _isEditMode = true;
+      _isRightPanelOpen = true;
+      _clearSelection();
     });
   }
 
@@ -575,7 +551,7 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
           if (_isSelectionMode) {
             _toggleSelection(entry.id);
           } else {
-            _openPasswordDetail(entry);
+            _openPasswordEdit(entry);
           }
         },
         onLongPress: () {
@@ -594,15 +570,24 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
       );
     }
 
-    // 移动端保持原有逻辑
+    // 移动端点击直接进入编辑
     return InkWell(
-      onTap: () {
+      onTap: () async {
         if (_isSelectionMode) {
           _toggleSelection(entry.id);
         } else {
+          // 验证后进入编辑模式
+          final verified = await requestPasswordVerification(
+            context,
+            ref,
+            reason: '编辑密码',
+          );
+
+          if (!verified || !mounted) return;
+
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => PasswordDetailScreen(entry: entry),
+              builder: (_) => AddPasswordScreen(entry: entry),
             ),
           );
         }
@@ -1110,7 +1095,7 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
           await _copyPassword(entry);
           break;
         case 'edit':
-          _openPasswordDetail(entry);
+          await _openPasswordEdit(entry);
           break;
         case 'delete':
           await _deleteEntry(entry);
@@ -1352,15 +1337,17 @@ class _AddPasswordFormState extends ConsumerState<_AddPasswordForm> {
 
             TextFormField(
               controller: _websiteController,
-              decoration: const InputDecoration(
-                labelText: '网站',
-                hintText: '例如：https://google.com',
-                prefixIcon: Icon(Icons.language),
+              decoration: InputDecoration(
+                labelText: _selectedType.websiteLabel,
+                hintText: _selectedType == PasswordEntryType.website
+                    ? '例如：https://google.com'
+                    : '根据需要填写',
+                prefixIcon: const Icon(Icons.language),
               ),
               textInputAction: TextInputAction.next,
               validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return '请输入网站';
+                if (_selectedType.isWebsiteRequired && (value == null || value.isEmpty)) {
+                  return '请输入${_selectedType.websiteLabel}';
                 }
                 return null;
               },
@@ -1369,14 +1356,16 @@ class _AddPasswordFormState extends ConsumerState<_AddPasswordForm> {
 
             TextFormField(
               controller: _usernameController,
-              decoration: const InputDecoration(
-                labelText: '用户名 / 邮箱',
-                prefixIcon: Icon(Icons.person),
+              decoration: InputDecoration(
+                labelText: _selectedType.usernameLabel,
+                prefixIcon: Icon(_selectedType == PasswordEntryType.wifi
+                    ? Icons.wifi
+                    : Icons.person),
               ),
               textInputAction: TextInputAction.next,
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return '请输入用户名';
+                  return '请输入${_selectedType.usernameLabel}';
                 }
                 return null;
               },
@@ -1385,36 +1374,39 @@ class _AddPasswordFormState extends ConsumerState<_AddPasswordForm> {
 
             TextFormField(
               controller: _passwordController,
-              obscureText: _obscurePassword,
+              obscureText: _obscurePassword && !_selectedType.isPasswordMultiline,
               decoration: InputDecoration(
-                labelText: '密码',
+                labelText: _selectedType.passwordLabel,
                 prefixIcon: const Icon(Icons.lock),
-                suffixIcon: SizedBox(
-                  width: 100,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.refresh),
-                        onPressed: _generatePassword,
-                        tooltip: '生成密码',
+                suffixIcon: _selectedType.requiresLongTextInput
+                    ? null
+                    : SizedBox(
+                        width: 100,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.refresh),
+                              onPressed: _generatePassword,
+                              tooltip: '生成密码',
+                            ),
+                            IconButton(
+                              icon: Icon(_obscurePassword
+                                  ? Icons.visibility
+                                  : Icons.visibility_off),
+                              onPressed: () {
+                                setState(() => _obscurePassword = !_obscurePassword);
+                              },
+                              tooltip: '显示/隐藏密码',
+                            ),
+                          ],
+                        ),
                       ),
-                      IconButton(
-                        icon: Icon(_obscurePassword
-                            ? Icons.visibility
-                            : Icons.visibility_off),
-                        onPressed: () {
-                          setState(() => _obscurePassword = !_obscurePassword);
-                        },
-                        tooltip: '显示/隐藏密码',
-                      ),
-                    ],
-                  ),
-                ),
               ),
+              maxLines: _selectedType.isPasswordMultiline ? 8 : 1,
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return '请输入密码';
+                  return '请输入${_selectedType.passwordLabel}';
                 }
                 return null;
               },
@@ -1712,15 +1704,17 @@ class _EditPasswordFormState extends ConsumerState<_EditPasswordForm> {
 
             TextFormField(
               controller: _websiteController,
-              decoration: const InputDecoration(
-                labelText: '网站',
-                hintText: '例如：https://google.com',
-                prefixIcon: Icon(Icons.language),
+              decoration: InputDecoration(
+                labelText: _selectedType.websiteLabel,
+                hintText: _selectedType == PasswordEntryType.website
+                    ? '例如：https://google.com'
+                    : '根据需要填写',
+                prefixIcon: const Icon(Icons.language),
               ),
               textInputAction: TextInputAction.next,
               validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return '请输入网站';
+                if (_selectedType.isWebsiteRequired && (value == null || value.isEmpty)) {
+                  return '请输入${_selectedType.websiteLabel}';
                 }
                 return null;
               },
@@ -1729,14 +1723,16 @@ class _EditPasswordFormState extends ConsumerState<_EditPasswordForm> {
 
             TextFormField(
               controller: _usernameController,
-              decoration: const InputDecoration(
-                labelText: '用户名 / 邮箱',
-                prefixIcon: Icon(Icons.person),
+              decoration: InputDecoration(
+                labelText: _selectedType.usernameLabel,
+                prefixIcon: Icon(_selectedType == PasswordEntryType.wifi
+                    ? Icons.wifi
+                    : Icons.person),
               ),
               textInputAction: TextInputAction.next,
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return '请输入用户名';
+                  return '请输入${_selectedType.usernameLabel}';
                 }
                 return null;
               },
@@ -1745,36 +1741,39 @@ class _EditPasswordFormState extends ConsumerState<_EditPasswordForm> {
 
             TextFormField(
               controller: _passwordController,
-              obscureText: _obscurePassword,
+              obscureText: _obscurePassword && !_selectedType.isPasswordMultiline,
               decoration: InputDecoration(
-                labelText: '密码',
+                labelText: _selectedType.passwordLabel,
                 prefixIcon: const Icon(Icons.lock),
-                suffixIcon: SizedBox(
-                  width: 100,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.refresh),
-                        onPressed: _generatePassword,
-                        tooltip: '生成密码',
+                suffixIcon: _selectedType.requiresLongTextInput
+                    ? null
+                    : SizedBox(
+                        width: 100,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.refresh),
+                              onPressed: _generatePassword,
+                              tooltip: '生成密码',
+                            ),
+                            IconButton(
+                              icon: Icon(_obscurePassword
+                                  ? Icons.visibility
+                                  : Icons.visibility_off),
+                              onPressed: () {
+                                setState(() => _obscurePassword = !_obscurePassword);
+                              },
+                              tooltip: '显示/隐藏密码',
+                            ),
+                          ],
+                        ),
                       ),
-                      IconButton(
-                        icon: Icon(_obscurePassword
-                            ? Icons.visibility
-                            : Icons.visibility_off),
-                        onPressed: () {
-                          setState(() => _obscurePassword = !_obscurePassword);
-                        },
-                        tooltip: '显示/隐藏密码',
-                      ),
-                    ],
-                  ),
-                ),
               ),
+              maxLines: _selectedType.isPasswordMultiline ? 8 : 1,
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return '请输入密码';
+                  return '请输入${_selectedType.passwordLabel}';
                 }
                 return null;
               },
@@ -2007,18 +2006,21 @@ class _PasswordDetailPanelState extends ConsumerState<_PasswordDetailPanel> {
           _buildDetailCard(
             theme,
             icon: Icons.person,
-            label: '用户名',
+            label: widget.entry.type.usernameLabel,
             value: widget.entry.username,
           ),
           const SizedBox(height: 16),
 
-          _buildDetailCard(
-            theme,
-            icon: Icons.language,
-            label: '网站',
-            value: widget.entry.website,
-          ),
-          const SizedBox(height: 16),
+          // Only show website if not empty or required
+          if (widget.entry.website.isNotEmpty || widget.entry.type.isWebsiteRequired) ...[
+            _buildDetailCard(
+              theme,
+              icon: Icons.language,
+              label: widget.entry.type.websiteLabel,
+              value: widget.entry.website,
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // 密码卡片
           Container(
@@ -2038,7 +2040,7 @@ class _PasswordDetailPanelState extends ConsumerState<_PasswordDetailPanel> {
                     const Icon(Icons.lock, size: 20, color: Color.fromARGB(255, 0, 72, 120)),
                     const SizedBox(width: 12),
                     Text(
-                      '密码',
+                      widget.entry.type.passwordLabel,
                       style: theme.textTheme.titleSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

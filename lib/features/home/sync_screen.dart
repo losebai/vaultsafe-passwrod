@@ -355,7 +355,6 @@ class _StorageDirectoryDialogState extends ConsumerState<_StorageDirectoryDialog
       setState(() => _isChanging = true);
 
       try {
-        // TODO: 实现更改目录逻辑
         if (mounted) {
           await ref
               .read(settingsProvider.notifier)

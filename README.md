@@ -2,7 +2,14 @@
 
 > **Secure · Private · Cross-Platform · End-to-End Encryption**
 
-VaultSafe is an open-source, secure, cross-platform password manager built with Flutter. All sensitive data is encrypted locally on your device using your master key - **servers cannot decrypt any data**. Supports complete offline usage with optional encrypted cloud sync.
+[![Version](https://img.shields.io/badge/version-1.0.1-blue)](https://github.com/yourusername/vaultsafe/releases)
+[![Flutter](https://img.shields.io/badge/Flutter-3.24+-brightgreen)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/Dart-3.5+-blue)](https://dart.dev)
+[![License](https://img.shields.io/badge/license-MIT-purple)](LICENSE)
+
+**VaultSafe** is an open-source, secure, cross-platform password manager built with Flutter. All sensitive data is encrypted locally on your device using your master key - **servers cannot decrypt any data**. Supports complete offline usage with optional encrypted cloud sync.
+
+**Current Version**: 1.0.1 | [更新日志](CHANGELOG.md)
 
 ---
 
@@ -14,6 +21,8 @@ VaultSafe is an open-source, secure, cross-platform password manager built with 
   - Create, read, update, delete password entries
   - Copy usernames and passwords to clipboard
   - Secure password viewing with toggle visibility
+  - **Password verification required** for viewing, copying, and editing (v1.0.1)
+  - **Configurable verification timeout** (10s/30s/1m/5m/15m) (v1.0.1)
   - Password generator utility (available for UI integration)
 - 🗂️ **Group Management**: Organize passwords into groups/folders
 - ⚙️ **Settings Center**:
@@ -23,6 +32,7 @@ VaultSafe is an open-source, secure, cross-platform password manager built with 
   - Auto-lock timeout configuration
   - Custom data directory selection
   - Biometric authentication toggle (UI ready, integration in progress)
+  - **Password verification timeout configuration** (v1.0.1)
 - 🔄 **Third-Party Sync** (Foundation):
   - Configure custom sync endpoints
   - Multiple authentication methods (Bearer Token, Basic Auth, Custom Headers)
@@ -30,23 +40,30 @@ VaultSafe is an open-source, secure, cross-platform password manager built with 
   - Connection testing
 - 🛡️ **Zero-Knowledge Architecture**: Server only stores encrypted blobs, cannot access plaintext
 - 💾 **Data Persistence**: Hive-based encrypted local storage with automatic recovery on app restart
+- ⚡ **Performance Optimization**:
+  - **Async key derivation using Isolates** - UI never freezes (v1.0.1)
+  - **100,000 PBKDF2 iterations** without blocking the main thread (v1.0.1)
+- 📁 **Unified Data Storage**:
+  - **All app data in one directory** (`vault_safe_data/`) (v1.0.1)
+  - **Automatic config migration** from old versions (v1.0.1)
 
 ---
 
 ## 🛠 Tech Stack
 
 - **Framework**: Flutter 3.24+ (Dart 3.5+)
-- **State Management**: Riverpod + StateNotifier
+- **State Management**: Riverpod (v2.5.1) + StateNotifier
 - **Local Storage**:
   - **Hive** (v2.2.3) - Lightweight NoSQL database for encrypted data storage
   - **Hive Flutter** (v1.1.0) - Flutter integration for Hive
   - **flutter_secure_storage** (v9.2.2) - Secure storage for sensitive data (master key, tokens)
   - **shared_preferences** (v2.3.2) - Simple key-value pairs for app settings
   - **path_provider** (v2.1.3) - Cross-platform file system paths
-- **Encryption**: `pointycastle` + `crypto` (PBKDF2 + AES-256-GCM)
-- **Network**: `dio` + custom sync protocol
-- **File Picker**: `file_picker` for backup import/export
-- **Biometrics**: `local_auth` (Face ID / Touch ID / Windows Hello)
+- **Encryption**: `pointycastle` (v3.9.1) + `crypto` (v3.0.3) (PBKDF2 + AES-256-GCM)
+- **Concurrency**: Dart Isolates (for async key derivation in v1.0.1)
+- **Network**: `dio` (v5.7.0) + custom sync protocol
+- **File Picker**: `file_picker` (v8.1.2) for backup import/export
+- **Biometrics**: `local_auth` (v2.3.0) (Face ID / Touch ID / Windows Hello)
 - **UI**: Material 3 Design System
 
 ---
@@ -289,6 +306,36 @@ Response:
 
 ## 🏗️ Development Status
 
+**Current Version**: **1.0.1** (2025-02-05)
+
+### ✅ Implemented Features (v1.0.1)
+
+- [x] Master password setup and authentication
+- [x] **Async key derivation** (UI never freezes)
+- [x] **Password verification for sensitive operations** (view, copy, edit)
+- [x] **Configurable verification timeout**
+- [x] Password CRUD operations
+- [x] Group/folder management
+- [x] Encrypted local storage (Hive)
+- [x] Import/export encrypted backups
+- [x] Change master password
+- [x] Auto-lock timeout settings
+- [x] Third-party sync configuration
+- [x] Password generator utility
+- [x] Custom data directory selection
+- [x] Detailed logging for debugging
+- [x] **Unified data directory structure**
+- [x] **Automatic config migration**
+- [x] **Improved error handling** for update service
+- [x] **Friendly error messages** for network issues
+
+### 🚧 In Progress
+
+- [ ] Biometric authentication integration
+- [ ] Auto-sync timer implementation
+- [ ] Password strength indicator
+- [ ] Password generator UI integration
+
 ### ✅ Implemented Features
 
 - [x] Master password setup and authentication
@@ -389,8 +436,26 @@ Contributions are welcome! Please ensure:
 
 - **Issues**: Report bugs and feature requests on GitHub Issues
 - **Documentation**: See `CLAUDE.md` for detailed Chinese documentation
+- **Changelog**: See [CHANGELOG.md](CHANGELOG.md) for version history and updates
+
+---
+
+## 📋 Changelog
+
+- **[1.0.1]** (2025-02-05) - [查看详情](CHANGELOG.md#101---2025-02-05)
+  - ✨ Password verification for sensitive operations
+  - ⚡ Async key derivation (UI never freezes)
+  - 📁 Unified data directory structure
+  - 🐛 Improved error handling
+
+- **[1.0.0]** (2025-01-XX) - Initial release
+  - 🎉 Core password management features
+  - 🔐 End-to-end encryption
+  - 🔄 Sync functionality
 
 ---
 
 > **VaultSafe — Your passwords belong only to you.**
-> Started in 2026, built for privacy.
+> Started in 2025, built for privacy.
+
+> **当前版本**: v1.0.1 | [更新日志](CHANGELOG.md)

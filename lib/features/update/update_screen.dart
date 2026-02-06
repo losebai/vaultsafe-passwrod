@@ -497,6 +497,49 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
   }
 
   Widget _buildErrorCard(UpdateState state, ThemeData theme) {
+    // 解析错误消息，提供更友好的提示
+    final error = state.errorMessage ?? '未知错误';
+    String friendlyTitle = '检查更新失败';
+    String friendlyMessage = error;
+    IconData errorIcon = Icons.error_outline;
+    Color iconColor = theme.colorScheme.error;
+    bool showRetry = true;
+
+    // 根据错误类型提供友好的提示
+    if (error.contains('Connection') || error.contains('Socket') || error.contains('Network')) {
+      friendlyTitle = '网络连接失败';
+      friendlyMessage = '无法连接到更新服务器\n\n请检查网络连接或稍后重试';
+      errorIcon = Icons.wifi_off;
+      iconColor = Colors.orange;
+    } else if (error.contains('Timeout') || error.contains('TimeoutException')) {
+      friendlyTitle = '连接超时';
+      friendlyMessage = '服务器响应超时，请稍后重试';
+      errorIcon = Icons.access_time;
+      iconColor = Colors.orange;
+    } else if (error.contains('404') || error.contains('Not Found')) {
+      friendlyTitle = '更新服务不可用';
+      friendlyMessage = '更新服务器暂时无法访问\n\n请联系管理员检查配置';
+      errorIcon = Icons.cloud_off;
+      iconColor = Colors.deepOrange;
+    } else if (error.contains('500') || error.contains('502') || error.contains('503')) {
+      friendlyTitle = '服务器错误';
+      friendlyMessage = '更新服务器出现故障\n\n请稍后重试或联系技术支持';
+      errorIcon = Icons.report_problem;
+      iconColor = Colors.red;
+    } else if (error.contains('update_server') || error.contains('配置')) {
+      friendlyTitle = '未配置更新服务器';
+      friendlyMessage = '系统未配置在线更新服务\n\n如需使用在线更新功能，请联系管理员配置服务器地址';
+      errorIcon = Icons.settings;
+      iconColor = Colors.blue;
+      showRetry = false; // 未配置时重试无意义
+    } else if (error.contains('update_server') || error.contains('未配置')) {
+      friendlyTitle = '更新服务未启用';
+      friendlyMessage = '当前版本未启用在线更新功能\n\n您可以继续使用当前版本';
+      errorIcon = Icons.info;
+      iconColor = Colors.blue;
+      showRetry = false;
+    }
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -506,45 +549,58 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
       child: Column(
         children: [
           Icon(
-            Icons.error_outline,
+            errorIcon,
             size: 64,
-            color: theme.colorScheme.error,
+            color: iconColor,
           ),
           const SizedBox(height: 16),
           Text(
-            '更新失败',
+            friendlyTitle,
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
+              color: iconColor,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
-            state.errorMessage ?? '未知错误',
-            style: theme.textTheme.bodyMedium,
+            friendlyMessage,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    ref.read(updateNotifierProvider.notifier).checkUpdate();
-                  },
-                  child: const Text('重试'),
+          if (showRetry) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      ref.read(updateNotifierProvider.notifier).checkUpdate();
+                    },
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('重试'),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('关闭'),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('关闭'),
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ] else ...[
+            FilledButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('知道了'),
+            ),
+          ],
         ],
       ),
     );

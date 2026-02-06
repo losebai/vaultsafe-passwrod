@@ -55,6 +55,9 @@ void main() async {
     await storage.write(key: 'data_directory', value: dataDirectory);
   }
 
+  // 将配置文件迁移到数据目录
+  await configService.setDataDirectory(dataDirectory);
+
   // 使用正确的目录初始化本地存储服务
   final storageService = StorageService();
   await storageService.init(customDirectory: dataDirectory);

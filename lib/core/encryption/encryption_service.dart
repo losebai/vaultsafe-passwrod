@@ -1,8 +1,55 @@
 import 'dart:typed_data';
 import 'dart:convert';
+import 'dart:isolate';
 import 'package:crypto/crypto.dart';
 import 'package:pointycastle/export.dart';
-import 'package:convert/convert.dart';
+
+/// Isolate 中执行密钥派生的参数
+class _DeriveKeyParams {
+  final String password;
+  final Uint8List salt;
+  final int iterations;
+  final int keySize;
+
+  _DeriveKeyParams({
+    required this.password,
+    required this.salt,
+    required this.iterations,
+    required this.keySize,
+  });
+}
+
+/// Isolate 消息包装器
+class _IsolateMessage {
+  final _DeriveKeyParams params;
+  final SendPort sendPort;
+
+  _IsolateMessage({
+    required this.params,
+    required this.sendPort,
+  });
+}
+
+/// 在 Isolate 中执行的密钥派生函数
+Uint8List _deriveKeyInIsolate(_DeriveKeyParams params) {
+  final mac = HMac(SHA256Digest(), 64);
+  final pkcs = PBKDF2KeyDerivator(mac);
+
+  final pkdf2Params = Pbkdf2Parameters(
+    params.salt,
+    params.iterations,
+    params.keySize,
+  );
+
+  pkcs.init(pkdf2Params);
+  return pkcs.process(Uint8List.fromList(utf8.encode(params.password)));
+}
+
+/// Isolate 入口点
+void _isolateEntryPoint(_IsolateMessage message) {
+  final result = _deriveKeyInIsolate(message.params);
+  message.sendPort.send(result);
+}
 
 /// Encryption service using PBKDF2 + AES-256-GCM
 /// All encryption happens locally on the device
@@ -13,6 +60,7 @@ class EncryptionService {
   static const int _saltSize = 16;
 
   /// Derive master key from master password using PBKDF2-HMAC-SHA256
+  /// 同步版本（在主线程执行，会导致卡顿）
   static Uint8List deriveKey(String password, Uint8List salt) {
     final mac = HMac(SHA256Digest(), 64);
     final pkcs = PBKDF2KeyDerivator(mac);
@@ -24,27 +72,45 @@ class EncryptionService {
     );
 
     pkcs.init(params);
+    return pkcs.process(Uint8List.fromList(utf8.encode(password)));
+  }
 
-    final key = pkcs.process(Uint8List.fromList(utf8.encode(password)));
-    return key as Uint8List;
+  /// Derive master key from master password using PBKDF2-HMAC-SHA256
+  /// 异步版本（在 Isolate 中执行，不会阻塞 UI）
+  static Future<Uint8List> deriveKeyAsync(String password, Uint8List salt) async {
+    final receivePort = ReceivePort();
+
+    await Isolate.spawn(
+      _isolateEntryPoint,
+      _IsolateMessage(
+        params: _DeriveKeyParams(
+          password: password,
+          salt: salt,
+          iterations: _iterations,
+          keySize: _keySize,
+        ),
+        sendPort: receivePort.sendPort,
+      ),
+    );
+
+    final result = await receivePort.first as Uint8List;
+    receivePort.close();
+
+    return result;
   }
 
   /// Generate a random salt for key derivation
   static Uint8List generateSalt() {
     final random = FortunaRandom();
     random.seed(KeyParameter(_generateRandomSeed()));
-
-    final salt = random.nextBytes(_saltSize);
-    return salt as Uint8List;
+    return random.nextBytes(_saltSize);
   }
 
   /// Generate random nonce for AES-GCM
   static Uint8List generateNonce() {
     final random = FortunaRandom();
     random.seed(KeyParameter(_generateRandomSeed()));
-
-    final nonce = random.nextBytes(_nonceSize);
-    return nonce as Uint8List;
+    return random.nextBytes(_nonceSize);
   }
 
   static Uint8List _generateRandomSeed() {

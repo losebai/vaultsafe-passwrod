@@ -78,15 +78,6 @@ class PasswordEntriesNotifier extends StateNotifier<AsyncValue<List<PasswordEntr
       });
     }
   }
-
-  List<PasswordEntry> searchEntries(String query) {
-    final entries = state.value ?? [];
-    if (query.isEmpty) return entries;
-
-    return entries.where((e) =>
-        e.title.toLowerCase().contains(query.toLowerCase()) ||
-        e.username.toLowerCase().contains(query.toLowerCase())).toList();
-  }
 }
 
 /// Password groups notifier

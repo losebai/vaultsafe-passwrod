@@ -78,8 +78,8 @@ class AppConfig {
 
   const AppConfig({
     // API
-    this.updateServer = 'https://api.yourserver.com/v1/update',
-    this.syncDefaultEndpoint = 'https://api.yourserver.com/api/v1/sync',
+    this.updateServer = '',
+    this.syncDefaultEndpoint = '',
     this.syncTimeout = 30,
 
     // 安全
@@ -159,8 +159,8 @@ class AppConfig {
   /// 从 YAML 映射创建配置
   factory AppConfig.fromYaml(YamlMap yaml) {
     return AppConfig(
-      updateServer: yaml['api']['update_server'] ?? 'https://api.yourserver.com/v1/update',
-      syncDefaultEndpoint: yaml['api']['sync']['default_endpoint'] ?? 'https://api.yourserver.com/api/v1/sync',
+      updateServer: yaml['api']['update_server'] ?? '',
+      syncDefaultEndpoint: yaml['api']['sync']['default_endpoint'] ?? '',
       syncTimeout: yaml['api']['sync']['timeout'] ?? 30,
 
       encryptionSalt: yaml['security']['encryption_salt'] ?? 'your-custom-salt-value',
@@ -454,9 +454,12 @@ class ConfigService {
   /// 从默认配置文件加载
   Future<AppConfig> _loadDefaultConfig() async {
     try {
+      log.d('从 assets 加载默认配置文件...', source: 'ConfigService');
       final configString = await rootBundle.loadString('assets/config/app_config.yaml');
       final yaml = loadYaml(configString) as YamlMap;
-      return AppConfig.fromYaml(yaml);
+      final config = AppConfig.fromYaml(yaml);
+      log.d('✅ 默认配置加载成功，updateServer = "${config.updateServer}"', source: 'ConfigService');
+      return config;
     } catch (e) {
       log.w('加载默认配置文件失败，使用硬编码默认值: $e', source: 'ConfigService');
       return const AppConfig();
@@ -468,19 +471,57 @@ class ConfigService {
     try {
       if (_configFilePath == null) {
         final appDocDir = await getApplicationDocumentsDirectory();
-        _configFilePath = path.join(appDocDir.path, 'app_config.yaml');
+        // 优先从数据目录加载配置
+        _configFilePath = path.join(appDocDir.path, 'vault_safe_data', 'app_config.yaml');
       }
+
+      // 调试：输出配置文件路径
+      log.d('检查本地配置文件: $_configFilePath', source: 'ConfigService');
+      log.d('文件是否存在: ${File(_configFilePath!).existsSync()}', source: 'ConfigService');
 
       final file = File(_configFilePath!);
       if (!await file.exists()) {
+        log.d('本地配置文件不存在，尝试从旧位置迁移...', source: 'ConfigService');
+        // 尝试从旧位置加载配置
+        final oldConfig = await _tryLoadFromOldLocation();
+        if (oldConfig != null) {
+          return oldConfig;
+        }
+        log.d('本地配置文件不存在，将使用默认配置', source: 'ConfigService');
         return null;
       }
 
+      log.d('✅ 找到本地配置文件，正在加载...', source: 'ConfigService');
       final configString = await file.readAsString();
       final yaml = loadYaml(configString) as YamlMap;
-      return AppConfig.fromYaml(yaml);
+      final config = AppConfig.fromYaml(yaml);
+      log.d('✅ 本地配置加载成功，updateServer = "${config.updateServer}"', source: 'ConfigService');
+      return config;
     } catch (e) {
       log.w('加载本地配置文件失败: $e', source: 'ConfigService');
+      return null;
+    }
+  }
+
+  /// 尝试从旧位置加载配置（用于迁移）
+  Future<AppConfig?> _tryLoadFromOldLocation() async {
+    try {
+      final appDocDir = await getApplicationDocumentsDirectory();
+      final oldPath = path.join(appDocDir.path, 'app_config.yaml');
+      final oldFile = File(oldPath);
+
+      if (await oldFile.exists()) {
+        log.d('从旧位置找到配置文件: $oldPath', source: 'ConfigService');
+        final configString = await oldFile.readAsString();
+        final yaml = loadYaml(configString) as YamlMap;
+        final config = AppConfig.fromYaml(yaml);
+        log.d('✅ 从旧位置加载配置成功，updateServer = "${config.updateServer}"', source: 'ConfigService');
+        return config;
+      }
+
+      return null;
+    } catch (e) {
+      log.w('从旧位置加载配置失败: $e', source: 'ConfigService');
       return null;
     }
   }
@@ -534,4 +575,42 @@ class ConfigService {
 
   /// 获取配置文件路径
   String? get configFilePath => _configFilePath;
+
+  /// 设置数据目录并迁移配置文件
+  Future<void> setDataDirectory(String dataDirectory) async {
+    try {
+      final newConfigPath = path.join(dataDirectory, 'app_config.yaml');
+
+      // 如果新路径和当前路径不同，需要迁移
+      if (_configFilePath != null && _configFilePath != newConfigPath) {
+        log.i('迁移配置文件到数据目录', source: 'ConfigService');
+        log.d('从: $_configFilePath', source: 'ConfigService');
+        log.d('到: $newConfigPath', source: 'ConfigService');
+
+        final oldFile = File(_configFilePath!);
+        final newFile = File(newConfigPath);
+
+        // 如果旧文件存在，复制到新位置
+        if (await oldFile.exists()) {
+          // 确保目标目录存在
+          await newFile.parent.create(recursive: true);
+
+          // 复制文件
+          await oldFile.copy(newConfigPath);
+
+          // 删除旧文件
+          await oldFile.delete();
+
+          log.i('配置文件迁移成功', source: 'ConfigService');
+        }
+
+        _configFilePath = newConfigPath;
+      } else if (_configFilePath == null) {
+        // 首次设置路径
+        _configFilePath = newConfigPath;
+      }
+    } catch (e, st) {
+      log.e('迁移配置文件失败', source: 'ConfigService', error: e, stackTrace: st);
+    }
+  }
 }

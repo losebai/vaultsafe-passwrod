@@ -72,7 +72,7 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
               leading: CircleAvatar(
                 radius: 28,
                 child: Text(
-                  widget.entry.title[0].toUpperCase(),
+                  widget.entry.title.isNotEmpty ? widget.entry.title[0].toUpperCase() : '?',
                   style: const TextStyle(fontSize: 24),
                 ),
               ),
@@ -80,24 +80,37 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
                 widget.entry.title,
                 style: theme.textTheme.titleLarge,
               ),
-              subtitle: Text(widget.entry.website),
+              subtitle: Row(
+                children: [
+                  Icon(widget.entry.type.icon, size: 16, color: theme.colorScheme.primary),
+                  const SizedBox(width: 4),
+                  Text(
+                    widget.entry.type.label,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
 
           _buildDetailTile(
             icon: Icons.person,
-            label: '用户名',
+            label: widget.entry.type.usernameLabel,
             value: widget.entry.username,
-            onCopy: () => _copyToClipboard(widget.entry.username, '用户名'),
+            onCopy: () => _copyToClipboard(widget.entry.username, widget.entry.type.usernameLabel),
           ),
 
           Card(
             child: ListTile(
               leading: const Icon(Icons.lock),
-              title: const Text('密码'),
+              title: Text(widget.entry.type.passwordLabel),
               subtitle: _passwordVisible && _decryptedPassword != null
-                  ? Text(_decryptedPassword!)
+                  ? Text(_decryptedPassword!,
+                      maxLines: widget.entry.type.isPasswordMultiline ? null : 1,
+                      overflow: widget.entry.type.isPasswordMultiline ? null : TextOverflow.ellipsis)
                   : const Text('••••••••'),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -117,12 +130,14 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
             ),
           ),
 
-          _buildDetailTile(
-            icon: Icons.language,
-            label: '网站',
-            value: widget.entry.website,
-            onCopy: () => _copyToClipboard(widget.entry.website, '网站'),
-          ),
+          // Only show website field if it's not empty or required
+          if (widget.entry.website.isNotEmpty || widget.entry.type.isWebsiteRequired)
+            _buildDetailTile(
+              icon: Icons.language,
+              label: widget.entry.type.websiteLabel,
+              value: widget.entry.website,
+              onCopy: () => _copyToClipboard(widget.entry.website, widget.entry.type.websiteLabel),
+            ),
 
           if (widget.entry.notes != null && widget.entry.notes!.isNotEmpty) ...[
             const SizedBox(height: 16),

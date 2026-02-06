@@ -86,8 +86,8 @@ class AuthService {
         List.generate(saltHex.length ~/ 2, (i) => int.parse(saltHex.substring(i * 2, i * 2 + 2), radix: 16)),
       );
 
-      //  用密码 + salt 派生加密密钥
-      final key = EncryptionService.deriveKey(password, salt);
+      //  用密码 + salt 派生加密密钥（使用异步版本，避免 UI 卡顿）
+      final key = await EncryptionService.deriveKeyAsync(password, salt);
 
       // 读取加密的验证器（verifier）
       final verifierJson = await _secureStorage.read(key: 'password_verifier');

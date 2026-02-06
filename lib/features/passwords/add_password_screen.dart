@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:vaultsafe/core/encryption/encryption_service.dart';
 import 'package:vaultsafe/shared/models/password_entry.dart';
+import 'package:vaultsafe/shared/models/password_entry_type.dart';
 import 'package:vaultsafe/shared/providers/password_provider.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
 import 'package:vaultsafe/shared/utils/password_generator.dart';
@@ -29,12 +30,14 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
   bool _obscurePassword = true;
   bool _isEditMode = false;
   bool _syncEnabled = true;
+  late PasswordEntryType _selectedType;
 
   @override
   void initState() {
     super.initState();
     _isEditMode = widget.entry != null;
     _syncEnabled = widget.entry?.syncEnabled ?? true;
+    _selectedType = widget.entry?.type ?? PasswordEntryType.website;
 
     _titleController = TextEditingController(text: widget.entry?.title ?? '');
     _websiteController = TextEditingController(text: widget.entry?.website ?? '');
@@ -54,6 +57,33 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // 类型选择器
+            DropdownButtonFormField<PasswordEntryType>(
+              initialValue: _selectedType,
+              decoration: const InputDecoration(
+                labelText: '密钥类型',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.category),
+              ),
+              items: PasswordEntryType.values.map((type) {
+                return DropdownMenuItem(
+                  value: type,
+                  child: Row(
+                    children: [
+                      Icon(type.icon, size: 20),
+                      const SizedBox(width: 12),
+                      Text(type.label),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => _selectedType = value);
+                }
+              },
+            ),
+            const SizedBox(height: 16),
             TextFormField(
               controller: _titleController,
               decoration: const InputDecoration(
@@ -71,14 +101,16 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _websiteController,
-              decoration: const InputDecoration(
-                labelText: 'HOST',
-                border: OutlineInputBorder(),
-                hintText: '例如：https://google.com',
+              decoration: InputDecoration(
+                labelText: _selectedType.websiteLabel,
+                border: const OutlineInputBorder(),
+                hintText: _selectedType == PasswordEntryType.website
+                    ? '例如：https://google.com'
+                    : '根据需要填写',
               ),
               validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return '请输入HOST';
+                if (_selectedType.isWebsiteRequired && (value == null || value.isEmpty)) {
+                  return '请输入${_selectedType.websiteLabel}';
                 }
                 return null;
               },
@@ -86,13 +118,13 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _usernameController,
-              decoration: const InputDecoration(
-                labelText: '用户名 / 邮箱',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: _selectedType.usernameLabel,
+                border: const OutlineInputBorder(),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return '请输入用户名';
+                  return '请输入${_selectedType.usernameLabel}';
                 }
                 return null;
               },
@@ -100,33 +132,36 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _passwordController,
-              obscureText: _obscurePassword,
+              obscureText: _obscurePassword && !_selectedType.isPasswordMultiline,
               decoration: InputDecoration(
-                labelText: _isEditMode ? '新密码（留空保持不变）' : '密码',
+                labelText: _isEditMode ? '新${_selectedType.passwordLabel}（留空保持不变）' : _selectedType.passwordLabel,
                 border: const OutlineInputBorder(),
-                suffixIcon: SizedBox(
-                  width: 100,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.refresh),
-                        onPressed: _generatePassword,
-                        tooltip: '生成密码',
+                suffixIcon: _selectedType.requiresLongTextInput
+                    ? null
+                    : SizedBox(
+                        width: 100,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.refresh),
+                              onPressed: _generatePassword,
+                              tooltip: '生成密码',
+                            ),
+                            IconButton(
+                              icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                              onPressed: () {
+                                setState(() => _obscurePassword = !_obscurePassword);
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                      IconButton(
-                        icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
-                        onPressed: () {
-                          setState(() => _obscurePassword = !_obscurePassword);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
               ),
+              maxLines: _selectedType.isPasswordMultiline ? 8 : 1,
               validator: (value) {
                 if (!_isEditMode && (value == null || value.isEmpty)) {
-                  return '请输入密码';
+                  return '请输入${_selectedType.passwordLabel}';
                 }
                 return null;
               },
@@ -196,6 +231,7 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
         groupId: widget.entry?.groupId ?? 'default',
         createdAt: widget.entry?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
+        type: _selectedType,
         syncEnabled: _syncEnabled,
       );
 
