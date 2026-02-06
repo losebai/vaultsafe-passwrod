@@ -1,322 +1,182 @@
 #!/usr/bin/env python3
 """
-VaultSafe 同步服务器
-简单的 Flask 服务器，用于存储和检索加密的密码备份
+VaultSafe 同步服务器 - FastAPI 版本
+简单的 FastAPI 服务器，用于存储和检索加密的密码备份
 支持多配置文件，通过 URL 参数指定配置名称
 """
 
 import json
 import os
 import re
+import shutil
 from datetime import datetime
-from functools import wraps
-from flask import Flask, request, jsonify, Response
-from flask_cors import CORS
+from typing import Optional, Dict, Any, List
+from contextlib import asynccontextmanager
 
-app = Flask(__name__)
-CORS(app)  # 启用跨域支持
+from fastapi import FastAPI, HTTPException, Request, Depends, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBasic, HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import ORJSONResponse
+from pydantic import BaseModel
+import uvicorn
+
+
+# 配置模型
+class SyncUploadData(BaseModel):
+    """同步上传数据模型"""
+    device_id: str
+    timestamp: int
+    encrypted_data: str
+    version: str = "1.0"
+
+
+class ConfigResponse(BaseModel):
+    """配置响应模型"""
+    name: str
+    last_updated: Optional[str] = None
+    has_data: bool = False
+    devices: List[str] = []
+    backup: Dict[str, Any] = {}
+    error: Optional[str] = None
+
+
+class StatusResponse(BaseModel):
+    """状态响应模型"""
+    status: str
+    data_dir: str
+    total_configs: int
+    configs: List[ConfigResponse]
+
 
 # 配置
 DEFAULT_CONFIG = 'default'
 PORT = 5000
-API_TOKEN = None  # 设置为 None 则不需要认证
-BASIC_AUTH_USERNAME = None
-BASIC_AUTH_PASSWORD = None
+API_TOKEN: Optional[str] = None  # 设置为 None 则不需要认证
+BASIC_AUTH_USERNAME: Optional[str] = None
+BASIC_AUTH_PASSWORD: Optional[str] = None
 DATA_DIR = 'sync_data'  # 数据目录
 
-
-def get_config_file(config_name):
-    """获取配置文件路径"""
-    # 安全检查：只允许文件名（字母、数字、下划线、连字符）
-    if not re.match(r'^[a-zA-Z0-9_-]+$', config_name):
-        raise ValueError(f"Invalid config name: {config_name}")
-
-    # 确保数据目录存在
-    os.makedirs(DATA_DIR, exist_ok=True)
-
-    return os.path.join(DATA_DIR, f"{config_name}.json")
+# 安全认证
+security_bearer = HTTPBearer(auto_error=False)
+security_basic = HTTPBasic(auto_error=False)
 
 
-def load_data(config_name):
-    """加载存储的数据"""
-    data_file = get_config_file(config_name)
+# 数据存储类
+class DataStore:
+    """数据存储管理类"""
 
-    if not os.path.exists(data_file):
-        return {
-            'config_name': config_name,
-            'encrypted_data': None,
-            'last_updated': None,
-            'device_info': {}
-        }
+    def __init__(self, data_dir: str):
+        self.data_dir = data_dir
+        os.makedirs(data_dir, exist_ok=True)
 
-    try:
-        with open(data_file, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (json.JSONDecodeError, IOError):
-        return {
-            'config_name': config_name,
-            'encrypted_data': None,
-            'last_updated': None,
-            'device_info': {}
-        }
+    def get_config_file(self, config_name: str) -> str:
+        """获取配置文件路径"""
+        # 安全检查：只允许文件名（字母、数字、下划线、连字符）
+        if not re.match(r'^[a-zA-Z0-9_-]+$', config_name):
+            raise ValueError(f"Invalid config name: {config_name}")
 
+        return os.path.join(self.data_dir, f"{config_name}.json")
 
-def save_data(config_name, data):
-    """保存数据到文件"""
-    data_file = get_config_file(config_name)
-    data['last_updated'] = datetime.now().isoformat()
-    data['config_name'] = config_name
+    def load_data(self, config_name: str) -> Dict[str, Any]:
+        """加载存储的数据"""
+        data_file = self.get_config_file(config_name)
 
-    with open(data_file, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
-
-def check_auth(f):
-    """认证检查装饰器"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth = request.authorization
-
-        # 检查 Bearer Token
-        if API_TOKEN:
-            bearer_token = None
-            if request.headers.get('Authorization'):
-                try:
-                    bearer_token = request.headers.get('Authorization').split(' ')[1]
-                except IndexError:
-                    pass
-
-            if bearer_token != API_TOKEN:
-                return Response('Unauthorized: Invalid Bearer Token', 401,
-                              {'WWW-Authenticate': 'Bearer realm="Login required"'})
-
-        # 检查 Basic Auth
-        if BASIC_AUTH_USERNAME and BASIC_AUTH_PASSWORD:
-            if auth is None or auth.username != BASIC_AUTH_USERNAME or auth.password != BASIC_AUTH_PASSWORD:
-                return Response('Unauthorized: Invalid credentials', 401,
-                              {'WWW-Authenticate': 'Basic realm="Login required"'})
-
-        return f(*args, **kwargs)
-    return decorated
-
-
-def parse_backup_data(encrypted_json):
-    """解析加密的备份数据 - 直接返回原始JSON"""
-    # 直接返回原始数据，不做任何转换
-    return encrypted_json
-
-
-@app.route('/sync/<config_name>', methods=['GET', 'POST'])
-@check_auth
-def sync(config_name):
-    """同步端点 - 支持 GET 和 POST，config_name 为配置名称"""
-
-    if request.method == 'POST':
-        # 上传数据
-        try:
-            request_data = request.get_json()
-
-            if not request_data:
-                return jsonify({'error': 'No data provided'}), 400
-
-            device_id = request_data.get('device_id')
-            timestamp = request_data.get('timestamp')
-            encrypted_data = request_data.get('encrypted_data')
-            version = request_data.get('version', '1.0')
-
-            if not encrypted_data:
-                return jsonify({'error': 'encrypted_data is required'}), 400
-
-            # 直接存储客户端发送的完整JSON数据
-            data = load_data(config_name)
-
-            # 更新加密数据
-            data['encrypted_data'] = encrypted_data
-
-            # 更新设备信息
-            if device_id:
-                data['device_info'][device_id] = {
-                    'last_upload': datetime.now().isoformat(),
-                    'timestamp': timestamp,
-                    'version': version
-                }
-
-            # 保存数据
-            save_data(config_name, data)
-
-            # 解析数据以获取信息（仅用于日志）
-            try:
-                backup = json.loads(encrypted_data)
-                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 数据已更新")
-                print(f"  配置名称: {config_name}")
-                print(f"  数据文件: {get_config_file(config_name)}")
-                print(f"  设备ID: {device_id}")
-                print(f"  备份版本: {backup.get('version', 'N/A')}")
-                print(f"  导出时间: {backup.get('exportedAt', 'N/A')}")
-            except:
-                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 数据已更新")
-                print(f"  配置名称: {config_name}")
-                print(f"  数据文件: {get_config_file(config_name)}")
-                print(f"  设备ID: {device_id}")
-
-            return jsonify({
-                'status': 'success',
+        if not os.path.exists(data_file):
+            return {
                 'config_name': config_name,
-                'message': 'Data uploaded successfully',
-                'stored_at': data['last_updated']
-            }), 200
+                'encrypted_data': None,
+                'last_updated': None,
+                'device_info': {}
+            }
 
-        except ValueError as e:
-            return jsonify({'error': str(e)}), 400
-        except Exception as e:
-            print(f"上传失败: {e}")
-            return jsonify({'error': str(e)}), 500
-
-    else:  # GET
-        # 下载数据
         try:
-            data = load_data(config_name)
+            with open(data_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {
+                'config_name': config_name,
+                'encrypted_data': None,
+                'last_updated': None,
+                'device_info': {}
+            }
 
-            if data['encrypted_data'] is None:
-                return jsonify({
-                    'error': 'No data available',
-                    'config_name': config_name,
-                    'message': f'No backup has been uploaded for config "{config_name}" yet'
-                }), 404
+    def save_data(self, config_name: str, data: Dict[str, Any]) -> None:
+        """保存数据到文件"""
+        data_file = self.get_config_file(config_name)
+        data['last_updated'] = datetime.now().isoformat()
+        data['config_name'] = config_name
 
-            # 直接返回存储的完整JSON字符串
-            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 数据已下载")
-            print(f"  配置名称: {config_name}")
-            print(f"  最后更新: {data['last_updated']}")
+        with open(data_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
 
-            # 解析数据以获取信息（仅用于日志）
-            try:
-                backup = json.loads(data['encrypted_data'])
-                print(f"  备份版本: {backup.get('version', 'N/A')}")
-                print(f"  导出时间: {backup.get('exportedAt', 'N/A')}")
-            except:
-                pass
-
-            # 返回完整的备份数据结构
-            # 直接返回 JSON 字符串，客户端自己解析
-            return json.loads(data['encrypted_data'])
-
-        except ValueError as e:
-            return jsonify({'error': str(e)}), 400
-        except Exception as e:
-            print(f"下载失败: {e}")
-            return jsonify({'error': str(e)}), 500
-
-
-@app.route('/status', methods=['GET'])
-def status():
-    """获取服务器状态"""
-    # 列出所有配置文件
-    configs = []
-    if os.path.exists(DATA_DIR):
-        for filename in os.listdir(DATA_DIR):
-            if filename.endswith('.json'):
-                config_name = filename[:-5]  # 移除 .json 后缀
-                config_file = os.path.join(DATA_DIR, filename)
-                try:
-                    with open(config_file, 'r', encoding='utf-8') as f:
-                        config_data = json.load(f)
-
-                    # 解析加密数据以获取信息
-                    has_data = config_data.get('encrypted_data') is not None
-                    backup_info = {}
-                    if has_data:
-                        try:
-                            backup = json.loads(config_data['encrypted_data'])
-                            backup_info = {
-                                'version': backup.get('version'),
-                                'exportedAt': backup.get('exportedAt'),
-                                'checksum': backup.get('checksum', '')[:16] + '...'  # 显示前16个字符
-                            }
-                        except:
-                            pass
-
-                    configs.append({
-                        'name': config_name,
-                        'last_updated': config_data.get('last_updated'),
-                        'has_data': has_data,
-                        'devices': list(config_data.get('device_info', {}).keys()),
-                        'backup': backup_info
-                    })
-                except Exception as e:
-                    configs.append({
-                        'name': config_name,
-                        'error': f'Unable to read: {str(e)}'
-                    })
-
-    return jsonify({
-        'status': 'running',
-        'data_dir': os.path.abspath(DATA_DIR),
-        'total_configs': len(configs),
-        'configs': configs
-    })
-
-
-@app.route('/clear/<config_name>', methods=['POST'])
-@check_auth
-def clear_config(config_name):
-    """清除指定配置的数据"""
-    try:
-        data_file = get_config_file(config_name)
+    def clear_config(self, config_name: str) -> None:
+        """清除指定配置的数据"""
+        data_file = self.get_config_file(config_name)
         if os.path.exists(data_file):
             os.remove(data_file)
 
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 配置已清除: {config_name}")
+    def clear_all(self) -> None:
+        """清除所有配置数据"""
+        if os.path.exists(self.data_dir):
+            shutil.rmtree(self.data_dir)
+        os.makedirs(self.data_dir)
 
-        return jsonify({
-            'status': 'success',
-            'config_name': config_name,
-            'message': f'Config "{config_name}" has been cleared'
-        }), 200
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    def list_configs(self) -> List[str]:
+        """列出所有配置文件"""
+        if not os.path.exists(self.data_dir):
+            return []
 
-
-@app.route('/clear', methods=['POST'])
-@check_auth
-def clear_all():
-    """清除所有配置数据"""
-    try:
-        if os.path.exists(DATA_DIR):
-            import shutil
-            shutil.rmtree(DATA_DIR)
-            os.makedirs(DATA_DIR)
-
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 所有配置已清除")
-
-        return jsonify({
-            'status': 'success',
-            'message': 'All configs have been cleared'
-        }), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        configs = []
+        for filename in os.listdir(self.data_dir):
+            if filename.endswith('.json'):
+                configs.append(filename[:-5])  # 移除 .json 后缀
+        return configs
 
 
-def print_banner():
-    """打印启动横幅"""
-    banner = """
-╔══════════════════════════════════════════════════════════╗
-║            VaultSafe 同步服务器                          ║
-║                                                            ║
-║  多配置支持 - 不同配置名称对应不同的数据文件            ║
-║                                                            ║
-╚══════════════════════════════════════════════════════════╝
-    """
-    print(banner)
-    print(f"📁 数据目录: {os.path.abspath(DATA_DIR)}")
+# 创建数据存储实例
+data_store = DataStore(DATA_DIR)
+
+
+# 依赖项：认证检查
+async def verify_auth(
+    bearer_credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
+    basic_credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_basic)
+) -> None:
+    """认证检查依赖项"""
+
+    # 检查 Bearer Token
+    if API_TOKEN:
+        if bearer_credentials and bearer_credentials.credentials == API_TOKEN:
+            return
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Bearer Token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 检查 Basic Auth
+    if BASIC_AUTH_USERNAME and BASIC_AUTH_PASSWORD:
+        if (basic_credentials and
+            basic_credentials.username == BASIC_AUTH_USERNAME and
+            basic_credentials.password == BASIC_AUTH_PASSWORD):
+            return
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+
+
+# 应用生命周期管理
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """应用生命周期管理"""
+    print(f"\n📁 数据目录: {os.path.abspath(DATA_DIR)}")
     print(f"🌐 同步端点: http://localhost:{PORT}/sync/<配置名>")
-    print(f"   示例: http://localhost:{PORT}/sync/default")
-    print(f"        http://localhost:{PORT}/sync/work")
-    print(f"        http://localhost:{PORT}/sync/personal")
     print(f"📊 状态查询: http://localhost:{PORT}/status")
-    print(f"🗑️  清除配置: POST http://localhost:{PORT}/clear/<配置名>")
+    print(f"📚 API 文档: http://localhost:{PORT}/docs")
 
     if API_TOKEN:
         print(f"🔐 Bearer Token: {API_TOKEN[:10]}...")
@@ -325,7 +185,277 @@ def print_banner():
     else:
         print("⚠️  警告: 未启用认证，任何人都可以访问数据！")
 
-    print("\n启动服务器...")
+    print("\n启动服务器...\n")
+    yield
+    print("\n服务器已关闭")
+
+
+# 创建 FastAPI 应用
+app = FastAPI(
+    title="VaultSafe Sync Server",
+    description="VaultSafe 密码管理器同步服务器 - 支持多配置文件存储",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# 配置 CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# 路由：同步端点
+@app.post("/sync/{config_name}")
+@app.get("/sync/{config_name}")
+async def sync(
+    config_name: str,
+    request: Request,
+    upload_data: Optional[SyncUploadData] = None,
+    _: None = Depends(verify_auth)
+):
+    """
+    同步端点 - 支持 GET 和 POST
+
+    - **POST**: 上传加密数据
+    - **GET**: 下载加密数据
+    """
+
+    try:
+        # 验证配置名称
+        data_store.get_config_file(config_name)
+
+        if request.method == "POST":
+            # 上传数据
+            if not upload_data:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No data provided"
+                )
+
+            if not upload_data.encrypted_data:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="encrypted_data is required"
+                )
+
+            # 加载现有数据
+            data = data_store.load_data(config_name)
+
+            # 更新加密数据
+            data['encrypted_data'] = upload_data.encrypted_data
+
+            # 更新设备信息
+            if upload_data.device_id:
+                data['device_info'][upload_data.device_id] = {
+                    'last_upload': datetime.now().isoformat(),
+                    'timestamp': upload_data.timestamp,
+                    'version': upload_data.version
+                }
+
+            # 保存数据
+            data_store.save_data(config_name, data)
+
+            # 日志输出
+            try:
+                backup = json.loads(upload_data.encrypted_data)
+                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 数据已更新")
+                print(f"  配置名称: {config_name}")
+                print(f"  数据文件: {data_store.get_config_file(config_name)}")
+                print(f"  设备ID: {upload_data.device_id}")
+                print(f"  备份版本: {backup.get('version', 'N/A')}")
+                print(f"  导出时间: {backup.get('exportedAt', 'N/A')}")
+            except:
+                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 数据已更新")
+                print(f"  配置名称: {config_name}")
+                print(f"  数据文件: {data_store.get_config_file(config_name)}")
+                print(f"  设备ID: {upload_data.device_id}")
+
+            return {
+                'status': 'success',
+                'config_name': config_name,
+                'message': 'Data uploaded successfully',
+                'stored_at': data['last_updated']
+            }
+
+        else:  # GET
+            # 下载数据
+            data = data_store.load_data(config_name)
+
+            if data['encrypted_data'] is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f'No backup has been uploaded for config "{config_name}" yet'
+                )
+
+            # 日志输出
+            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 数据已下载")
+            print(f"  配置名称: {config_name}")
+            print(f"  最后更新: {data['last_updated']}")
+
+            try:
+                backup = json.loads(data['encrypted_data'])
+                print(f"  备份版本: {backup.get('version', 'N/A')}")
+                print(f"  导出时间: {backup.get('exportedAt', 'N/A')}")
+            except:
+                pass
+
+            # 返回完整的备份数据
+            return ORJSONResponse(content=json.loads(data['encrypted_data']))
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"同步失败: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+# 路由：状态查询
+@app.get("/status", response_model=StatusResponse)
+async def get_status():
+    """
+    获取服务器状态
+
+    返回所有配置文件的信息，包括：
+    - 配置名称
+    - 最后更新时间
+    - 是否有数据
+    - 设备列表
+    - 备份信息
+    """
+
+    configs = []
+    config_names = data_store.list_configs()
+
+    for config_name in config_names:
+        config_file = data_store.get_config_file(config_name)
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config_data = json.load(f)
+
+            has_data = config_data.get('encrypted_data') is not None
+            backup_info = {}
+
+            if has_data:
+                try:
+                    backup = json.loads(config_data['encrypted_data'])
+                    backup_info = {
+                        'version': backup.get('version'),
+                        'exportedAt': backup.get('exportedAt'),
+                        'checksum': backup.get('checksum', '')[:16] + '...'
+                    }
+                except:
+                    pass
+
+            configs.append(ConfigResponse(
+                name=config_name,
+                last_updated=config_data.get('last_updated'),
+                has_data=has_data,
+                devices=list(config_data.get('device_info', {}).keys()),
+                backup=backup_info
+            ))
+        except Exception as e:
+            configs.append(ConfigResponse(
+                name=config_name,
+                error=f'Unable to read: {str(e)}'
+            ))
+
+    return StatusResponse(
+        status="running",
+        data_dir=os.path.abspath(DATA_DIR),
+        total_configs=len(configs),
+        configs=configs
+    )
+
+
+# 路由：清除指定配置
+@app.post("/clear/{config_name}")
+async def clear_config(
+    config_name: str,
+    _: None = Depends(verify_auth)
+):
+    """
+    清除指定配置的数据
+    """
+
+    try:
+        data_store.clear_config(config_name)
+
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 配置已清除: {config_name}")
+
+        return {
+            'status': 'success',
+            'config_name': config_name,
+            'message': f'Config "{config_name}" has been cleared'
+        }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+# 路由：清除所有配置
+@app.post("/clear")
+async def clear_all(
+    _: None = Depends(verify_auth)
+):
+    """
+    清除所有配置数据
+    """
+
+    try:
+        data_store.clear_all()
+
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 所有配置已清除")
+
+        return {
+            'status': 'success',
+            'message': 'All configs have been cleared'
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+# 路由：健康检查
+@app.get("/health")
+async def health_check():
+    """
+    健康检查端点
+    """
+    return {"status": "healthy", "service": "vaultsafe-sync-server"}
+
+
+def print_banner():
+    """打印启动横幅"""
+    banner = """
+╔══════════════════════════════════════════════════════════╗
+║            VaultSafe 同步服务器 (FastAPI)               ║
+║                                                            ║
+║  多配置支持 - 不同配置名称对应不同的数据文件            ║
+║                                                            ║
+╚══════════════════════════════════════════════════════════╝
+    """
+    print(banner)
 
 
 if __name__ == '__main__':
@@ -336,11 +466,16 @@ if __name__ == '__main__':
     PORT = int(os.getenv('VAULTSAFE_PORT', PORT))
     DATA_DIR = os.getenv('VAULTSAFE_DATA_DIR', DATA_DIR)
 
+    # 更新数据存储实例
+    data_store = DataStore(DATA_DIR)
+
     print_banner()
 
     # 启动服务器
-    app.run(
-        host='0.0.0.0',
+    uvicorn.run(
+        "sync_server:app",
+        host="0.0.0.0",
         port=PORT,
-        debug=False
+        reload=False,
+        access_log=False
     )
