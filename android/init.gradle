@@ -1,0 +1,47 @@
+import javax.inject.Named
+import org.apache.http.impl.client.CloseableHttpClient
+import org.gradle.api.artifacts.repositories.ArtifactRepository
+import org.gradle.api.artifacts.repositories.IvyArtifactRepository
+import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.Strategy
+import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.parser.PomDescriptor
+import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.parser.MetaDataParser
+
+allprojects {
+    buildscript {
+        repositories {
+            // 尝试使用阿里云镜像
+            maven { url 'https://maven.aliyun.com/repository/google' }
+            maven { url 'https://maven.aliyun.com/repository/central' }
+            maven { url 'https://maven.aliyun.com/repository/public' }
+            maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+            // 如果以上都失败，尝试原始地址
+            maven { url 'https://dl.google.com/dl/android/maven2' }
+            google()
+            mavenCentral()
+        }
+    }
+
+    repositories {
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/central' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url 'https://maven.aliyun.com/repository/jcenter' }
+        maven { url 'https://dl.google.com/dl/android/maven2' }
+        google()
+        mavenCentral()
+    }
+}
+
+// 强制使用阿里云镜像替代 Google 仓库
+gradle.beforeProject { project ->
+    project.repositories?.forEach { repo ->
+        if (repo instanceof MavenArtifactRepository) {
+            def url = repo.url?.toString()
+            if (url?.contains('storage.googleapis.com')) {
+                println "Replacing Google repository: ${url}"
+                // 移除无法访问的 Google 仓库
+                project.repositories.remove(repo)
+            }
+        }
+    }
+}
