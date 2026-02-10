@@ -124,7 +124,7 @@ class _SetupPasswordScreenState extends ConsumerState<SetupPasswordScreen> {
     setState(() => _isLoading = false);
 
     // 导航到主界面
-    Navigator.of(context).pushReplacementNamed('/');
+    Navigator.of(context).pushReplacementNamed('/home');
   }
 
   @override

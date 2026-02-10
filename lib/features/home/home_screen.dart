@@ -55,6 +55,18 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   ];
 
+  final List<_NavigationItem> _appNavItems = const [ _NavigationItem(
+    icon: Icons.password_rounded,
+    selectedIcon: Icons.password_rounded,
+    label: '密码',
+  ),
+    _NavigationItem(
+      icon: Icons.settings_rounded,
+      selectedIcon: Icons.settings_rounded,
+      label: '设置',
+    )
+  ];
+
   // 检测是否为桌面平台
   bool get _isDesktop =>
       Platform.isWindows || Platform.isMacOS || Platform.isLinux;
@@ -90,11 +102,12 @@ class _HomeScreenState extends State<HomeScreen> {
         onDestinationSelected: (index) {
           setState(() => _selectedIndex = index);
         },
-        destinations: _navItems
-            .map((item) => NavigationDestination(
-                  icon: Icon(item.icon),
-                  label: item.label,
-                ))
+        destinations: _appNavItems
+            .map((item) =>
+            NavigationDestination(
+              icon: Icon(item.icon),
+              label: item.label,
+            ))
             .toList(),
       ),
     );
@@ -377,7 +390,8 @@ class _LogsLayoutState extends ConsumerState<_LogsLayout>
               // TabBar
               Container(
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.3),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: theme.dividerColor.withValues(alpha: 0.1),
@@ -540,8 +554,7 @@ class _LogsLayoutState extends ConsumerState<_LogsLayout>
         '${timestamp.second.toString().padLeft(2, '0')}';
   }
 
-  Widget _buildLogItem(
-    ThemeData theme, {
+  Widget _buildLogItem(ThemeData theme, {
     required IconData icon,
     required String title,
     required String description,

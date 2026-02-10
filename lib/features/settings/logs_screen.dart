@@ -18,7 +18,8 @@ class LogsScreen extends ConsumerStatefulWidget {
   ConsumerState<LogsScreen> createState() => _LogsScreenState();
 }
 
-class _LogsScreenState extends ConsumerState<LogsScreen> with SingleTickerProviderStateMixin {
+class _LogsScreenState extends ConsumerState<LogsScreen>
+    with SingleTickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   bool _autoScroll = true;
   late TabController _tabController;
@@ -163,7 +164,8 @@ class _LogsScreenState extends ConsumerState<LogsScreen> with SingleTickerProvid
                 ),
               ),
             ),
-            child: Column(
+            child: SingleChildScrollView(
+                child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // 日志级别图标统计 - 横向排列
@@ -203,7 +205,8 @@ class _LogsScreenState extends ConsumerState<LogsScreen> with SingleTickerProvid
                     const Spacer(),
                     // 总数显示
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.primaryContainer,
                         borderRadius: BorderRadius.circular(16),
@@ -211,7 +214,9 @@ class _LogsScreenState extends ConsumerState<LogsScreen> with SingleTickerProvid
                       child: Text(
                         '总计 ${stats['total'] ?? 0}',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onPrimaryContainer,
                               fontWeight: FontWeight.bold,
                             ),
                       ),
@@ -228,7 +233,8 @@ class _LogsScreenState extends ConsumerState<LogsScreen> with SingleTickerProvid
                         ? IconButton(
                             icon: const Icon(Icons.clear),
                             onPressed: () {
-                              ref.read(logSearchQueryProvider.notifier).state = '';
+                              ref.read(logSearchQueryProvider.notifier).state =
+                                  '';
                             },
                           )
                         : null,
@@ -245,7 +251,7 @@ class _LogsScreenState extends ConsumerState<LogsScreen> with SingleTickerProvid
                   },
                 ),
               ],
-            ),
+            )),
           ),
           // 日志列表 - 占满剩余空间
           Expanded(
@@ -273,9 +279,10 @@ class _LogsScreenState extends ConsumerState<LogsScreen> with SingleTickerProvid
                         const SizedBox(height: 16),
                         Text(
                           searchQuery.isEmpty ? '暂无日志' : '未找到匹配的日志',
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                color: Theme.of(context).disabledColor,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    color: Theme.of(context).disabledColor,
+                                  ),
                         ),
                       ],
                     ),
@@ -368,7 +375,8 @@ class _LogsScreenState extends ConsumerState<LogsScreen> with SingleTickerProvid
     return InkWell(
       onTap: () {
         // 点击芯片时过滤对应级别
-        ref.read(logFilterLevelProvider.notifier).state = _levelFromLabel(label);
+        ref.read(logFilterLevelProvider.notifier).state =
+            _levelFromLabel(label);
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
