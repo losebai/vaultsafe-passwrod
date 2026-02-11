@@ -168,8 +168,11 @@ class _LogsScreenState extends ConsumerState<LogsScreen>
                 child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 日志级别图标统计 - 横向排列
-                Row(
+                // 日志级别图标统计 - 使用 Wrap 自动换行避免溢出
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     _buildLogLevelChip(
                       context,
@@ -178,7 +181,6 @@ class _LogsScreenState extends ConsumerState<LogsScreen>
                       count: stats['debug'] ?? 0,
                       color: Colors.grey,
                     ),
-                    const SizedBox(width: 8),
                     _buildLogLevelChip(
                       context,
                       icon: Icons.info_outline,
@@ -186,7 +188,6 @@ class _LogsScreenState extends ConsumerState<LogsScreen>
                       count: stats['info'] ?? 0,
                       color: Colors.blue,
                     ),
-                    const SizedBox(width: 8),
                     _buildLogLevelChip(
                       context,
                       icon: Icons.warning_amber_outlined,
@@ -194,7 +195,6 @@ class _LogsScreenState extends ConsumerState<LogsScreen>
                       count: stats['warning'] ?? 0,
                       color: Colors.orange,
                     ),
-                    const SizedBox(width: 8),
                     _buildLogLevelChip(
                       context,
                       icon: Icons.error_outline,
@@ -202,7 +202,6 @@ class _LogsScreenState extends ConsumerState<LogsScreen>
                       count: stats['error'] ?? 0,
                       color: Colors.red,
                     ),
-                    const Spacer(),
                     // 总数显示
                     Container(
                       padding: const EdgeInsets.symmetric(

@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -7,9 +6,11 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:vaultsafe/shared/providers/settings_provider.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
 import 'package:vaultsafe/shared/providers/password_provider.dart';
+import 'package:vaultsafe/shared/models/settings.dart';
 import 'package:vaultsafe/features/settings/logs_screen.dart';
 import 'package:vaultsafe/features/update/update_screen.dart';
 import 'package:vaultsafe/shared/widgets/sync_settings_dialog.dart';
+import 'package:vaultsafe/shared/widgets/sync_buttons.dart';
 import 'package:vaultsafe/shared/helpers/backup_helper.dart';
 
 /// 设置界面
@@ -102,35 +103,7 @@ class SettingsScreen extends ConsumerWidget {
 
                 if (Platform.isAndroid) ...[
                   // 同步设置
-                  _buildSettingsCard(
-                    theme,
-                    title: '同步',
-                    icon: Icons.sync_outlined,
-                    items: [
-                      _SettingsItem(
-                        icon: Icons.cloud_sync,
-                        title: '启用同步',
-                        description: settings.syncEnabled ? '已启用' : '已禁用',
-                        trailing: Switch(
-                          value: settings.syncEnabled,
-                          onChanged: (value) {
-                            ref
-                                .read(settingsProvider.notifier)
-                                .updateSyncEnabled(value);
-                            if (value) {
-                              _showSyncSettingsDialog(context);
-                            }
-                          },
-                        ),
-                      ),
-                      _SettingsItem(
-                        icon: Icons.settings,
-                        title: '同步配置',
-                        description: settings.syncConfig?.endpointUrl ?? '未配置',
-                        onTap: () => _showSyncSettingsDialog(context),
-                      ),
-                    ],
-                  ),
+                  _buildSyncCard(context, theme, settings, ref),
                 ],
 
                 const SizedBox(height: 24),
@@ -336,6 +309,148 @@ class SettingsScreen extends ConsumerWidget {
       return '${timeout.inMinutes} 分钟';
     }
     return '${timeout.inSeconds} 秒';
+  }
+
+  // 构建同步卡片（包含同步按钮）
+  Widget _buildSyncCard(BuildContext context, ThemeData theme, AppSettings settings, WidgetRef ref) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: theme.dividerColor.withValues(alpha: 0.1),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer
+                        .withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.sync_outlined,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  '同步',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 启用同步开关
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.cloud_sync,
+                  size: 20,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '启用同步',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        settings.syncEnabled ? '已启用' : '已禁用',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: settings.syncEnabled,
+                  onChanged: (value) {
+                    ref
+                        .read(settingsProvider.notifier)
+                        .updateSyncEnabled(value);
+                    if (value) {
+                      _showSyncSettingsDialog(context);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, indent: 56),
+          // 同步配置
+          InkWell(
+            onTap: () => _showSyncSettingsDialog(context),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.settings,
+                    size: 20,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '同步配置',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          settings.syncConfig?.endpointUrl ?? '未配置',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 20,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Divider(height: 1, indent: 56),
+          // 同步按钮
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: SyncButtons(settings: settings),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
   }
 
   // 显示修改密码弹窗
