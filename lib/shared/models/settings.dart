@@ -4,6 +4,7 @@ import 'package:vaultsafe/core/sync/sync_config.dart';
 /// 应用设置模型
 class AppSettings {
   final bool biometricEnabled;
+  final bool biometricFullUnlock; // 指纹完全解锁（存储加密主密码）
   final Duration autoLockTimeout;
   final Duration passwordVerificationTimeout;
   final bool syncEnabled;
@@ -14,6 +15,7 @@ class AppSettings {
 
   AppSettings({
     required this.biometricEnabled,
+    this.biometricFullUnlock = false,
     required this.autoLockTimeout,
     this.passwordVerificationTimeout = const Duration(seconds: 30),
     required this.syncEnabled,
@@ -25,6 +27,7 @@ class AppSettings {
 
   AppSettings copyWith({
     bool? biometricEnabled,
+    bool? biometricFullUnlock,
     Duration? autoLockTimeout,
     Duration? passwordVerificationTimeout,
     bool? syncEnabled,
@@ -35,6 +38,7 @@ class AppSettings {
   }) {
     return AppSettings(
       biometricEnabled: biometricEnabled ?? this.biometricEnabled,
+      biometricFullUnlock: biometricFullUnlock ?? this.biometricFullUnlock,
       autoLockTimeout: autoLockTimeout ?? this.autoLockTimeout,
       passwordVerificationTimeout: passwordVerificationTimeout ?? this.passwordVerificationTimeout,
       syncEnabled: syncEnabled ?? this.syncEnabled,

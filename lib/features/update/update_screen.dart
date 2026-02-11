@@ -179,6 +179,15 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('检查更新'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Container(
+            height: 0.5,
+            decoration: BoxDecoration(
+              color: theme.dividerColor.withValues(alpha: 0.1),
+            ),
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),

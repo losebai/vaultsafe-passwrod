@@ -52,9 +52,19 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('同步设置'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Container(
+            height: 0.5,
+            decoration: BoxDecoration(
+              color: theme.dividerColor.withValues(alpha: 0.1),
+            ),
+          ),
+        ),
       ),
       body: Form(
         key: _formKey,

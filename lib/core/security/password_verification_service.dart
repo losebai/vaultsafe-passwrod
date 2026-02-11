@@ -99,7 +99,7 @@ class PasswordVerificationService {
       context,
       title: reason ?? '验证主密码',
       hintText: '请输入主密码以继续',
-      onVerify: (password) {
+      onVerify: (password) async {
         try {
           // 验证密码是否正确
           final authService = ref.read(authServiceProvider);
@@ -107,8 +107,8 @@ class PasswordVerificationService {
             return false;
           }
 
-          // 使用密码派生密钥并尝试验证
-          final testKey = EncryptionService.deriveKey(password, saltBytes);
+          // 使用异步密钥派生，避免 UI 卡顿
+          final testKey = await EncryptionService.deriveKeyAsync(password, saltBytes);
 
           // 如果当前已解锁，比较密钥是否一致
           final currentKey = authService.masterKey;

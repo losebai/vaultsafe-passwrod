@@ -48,9 +48,19 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditMode ? '编辑密码' : '添加密码'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Container(
+            height: 0.5,
+            decoration: BoxDecoration(
+              color: theme.dividerColor.withValues(alpha: 0.1),
+            ),
+          ),
+        ),
       ),
       body: Form(
         key: _formKey,

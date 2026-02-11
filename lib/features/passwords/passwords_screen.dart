@@ -155,7 +155,9 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
     // 移动端布局
     return Scaffold(
       appBar: AppBar(
-        title: const Text('密码'),
+        title: Text('密码', style: theme.textTheme.headlineMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+        ),),
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
@@ -168,6 +170,15 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
             tooltip: '添加',
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Container(
+            height: 0.5,
+            decoration: BoxDecoration(
+              color: theme.dividerColor.withValues(alpha: 0.1),
+            ),
+          ),
+        ),
       ),
       body: Column(
         children: [

@@ -146,7 +146,7 @@ class SyncButtonsState extends ConsumerState<SyncButtons> {
         context,
         title: '输入加密密码',
         hintText: '此密码将用于加密备份数据',
-        onVerify: (password) {
+        onVerify: (password) async {
           // 只需要验证密码不为空即可
           return password.isNotEmpty;
         },
@@ -172,7 +172,7 @@ class SyncButtonsState extends ConsumerState<SyncButtons> {
       final saltBytes = Uint8List.fromList(
         List.generate(saltHex!.length ~/ 2, (i) => int.parse(saltHex!.substring(i * 2, i * 2 + 2), radix: 16)),
       );
-      masterKey = EncryptionService.deriveKey(customPassword, saltBytes);
+      masterKey = await EncryptionService.deriveKeyAsync(customPassword, saltBytes);
     } else {
       // 使用当前主密码
       final authService = ref.read(authServiceProvider);
@@ -524,9 +524,9 @@ class SyncButtonsState extends ConsumerState<SyncButtons> {
       context,
       title: '输入解密密码',
       hintText: '此备份使用不同的主密码加密',
-      onVerify: (password) {
+      onVerify: (password) async {
         try {
-          final customKey = EncryptionService.deriveKey(password, saltBytes);
+          final customKey = await EncryptionService.deriveKeyAsync(password, saltBytes);
           final testDecrypted = EncryptionService.decrypt(encrypted, customKey);
 
           // 验证校验和
@@ -545,7 +545,7 @@ class SyncButtonsState extends ConsumerState<SyncButtons> {
     if (customPassword == null) return null;
 
     // 使用自定义密码解密
-    final customKey = EncryptionService.deriveKey(customPassword, saltBytes);
+    final customKey = await EncryptionService.deriveKeyAsync(customPassword, saltBytes);
     return EncryptionService.decrypt(encrypted, customKey);
   }
 
@@ -565,10 +565,10 @@ class SyncButtonsState extends ConsumerState<SyncButtons> {
       context,
       title: '输入主密码',
       hintText: '请输入主密码以解密备份数据',
-      onVerify: (password) {
+      onVerify: (password) async {
         try {
-          // 使用备份中的 salt 派生密钥
-          final testKey = EncryptionService.deriveKey(password, saltBytes);
+          // 使用备份中的 salt 派生密钥（异步）
+          final testKey = await EncryptionService.deriveKeyAsync(password, saltBytes);
           final testDecrypted = EncryptionService.decrypt(encrypted, testKey);
 
           // 验证校验和
@@ -586,8 +586,8 @@ class SyncButtonsState extends ConsumerState<SyncButtons> {
 
     if (masterPassword == null) return null;
 
-    // 使用主密码和备份的 salt 解密
-    final backupKey = EncryptionService.deriveKey(masterPassword, saltBytes);
+    // 使用主密码和备份的 salt 解密（异步）
+    final backupKey = await EncryptionService.deriveKeyAsync(masterPassword, saltBytes);
     return EncryptionService.decrypt(encrypted, backupKey);
   }
 }

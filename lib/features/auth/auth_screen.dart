@@ -46,7 +46,35 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     if (available) {
       final authenticated = await authService.authenticateWithBiometrics();
       if (authenticated && mounted) {
-        _navigateToHome();
+        // 指纹验证成功，尝试获取存储的主密码
+        final storedPassword = await authService.getDecryptedMasterPassword();
+
+        if (storedPassword != null && mounted) {
+          // 有存储的主密码，直接派生密钥并进入主页
+          setState(() => _isLoading = true);
+          final success = await authService.verifyMasterPassword(storedPassword);
+
+          if (!mounted) return;
+          setState(() => _isLoading = false);
+
+          if (success) {
+            _navigateToHome();
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('自动解锁失败，请手动输入密码')),
+            );
+          }
+        } else {
+          // 没有存储的主密码，显示提示让用户输入
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('指纹验证成功，请输入主密码解锁'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        }
       }
     }
   }

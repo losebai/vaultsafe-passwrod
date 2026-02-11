@@ -11,6 +11,7 @@ import 'package:vaultsafe/features/settings/logs_screen.dart';
 import 'package:vaultsafe/features/update/update_screen.dart';
 import 'package:vaultsafe/shared/widgets/sync_settings_dialog.dart';
 import 'package:vaultsafe/shared/widgets/sync_buttons.dart';
+import 'package:vaultsafe/shared/widgets/master_password_dialog.dart';
 import 'package:vaultsafe/shared/helpers/backup_helper.dart';
 
 /// 设置界面
@@ -23,6 +24,25 @@ class SettingsScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
+      appBar: Platform.isAndroid
+          ? AppBar(
+              title: Text(
+                '设置',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(0.5),
+                child: Container(
+                  height: 0.5,
+                  decoration: BoxDecoration(
+                    color: theme.dividerColor.withValues(alpha: 0.1),
+                  ),
+                ),
+              ),
+            )
+          : null,
       body: settingsAsync.when(
         data: (settings) {
           return SingleChildScrollView(
@@ -31,14 +51,15 @@ class SettingsScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // 标题
-                Text(
-                  '设置',
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                if (!Platform.isAndroid && !Platform.isIOS) ...[
+                  Text(
+                    '设置',
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 32),
-
+                  const SizedBox(height: 32),
+                ],
                 // 安全设置
                 _buildSettingsCard(
                   theme,
@@ -61,7 +82,8 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingsItem(
                       icon: Icons.verified_user_outlined,
                       title: '密码验证超时',
-                      description: _formatTimeout(settings.passwordVerificationTimeout),
+                      description:
+                          _formatTimeout(settings.passwordVerificationTimeout),
                       onTap: () => _showPasswordVerificationTimeoutDialog(
                           context, ref, settings.passwordVerificationTimeout),
                     ),
@@ -78,6 +100,21 @@ class SettingsScreen extends ConsumerWidget {
                         },
                       ),
                     ),
+                    if (settings.biometricEnabled)
+                      _SettingsItem(
+                        icon: Icons.lock_open,
+                        title: '指纹完全解锁',
+                        description: settings.biometricFullUnlock
+                            ? '已启用 - 指纹可直接解锁'
+                            : '已禁用 - 指纹后需输入密码',
+                        trailing: Switch(
+                          value: settings.biometricFullUnlock,
+                          onChanged: (value) {
+                            _handleBiometricFullUnlockChange(
+                                context, ref, value, settings);
+                          },
+                        ),
+                      ),
                   ],
                 ),
 
@@ -312,7 +349,8 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   // 构建同步卡片（包含同步按钮）
-  Widget _buildSyncCard(BuildContext context, ThemeData theme, AppSettings settings, WidgetRef ref) {
+  Widget _buildSyncCard(BuildContext context, ThemeData theme,
+      AppSettings settings, WidgetRef ref) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -475,7 +513,8 @@ class SettingsScreen extends ConsumerWidget {
       BuildContext context, WidgetRef ref, Duration current) {
     showDialog(
       context: context,
-      builder: (context) => _PasswordVerificationTimeoutDialog(current: current),
+      builder: (context) =>
+          _PasswordVerificationTimeoutDialog(current: current),
     );
   }
 
@@ -512,6 +551,90 @@ class SettingsScreen extends ConsumerWidget {
 
   Future<void> _importBackup(BuildContext context, WidgetRef ref) async {
     await BackupHelper.importBackup(context, ref);
+  }
+
+  // 处理指纹完全解锁开关变化
+  Future<void> _handleBiometricFullUnlockChange(
+    BuildContext context,
+    WidgetRef ref,
+    bool value,
+    AppSettings settings,
+  ) async {
+    if (!value) {
+      // 禁用时直接更新设置，删除存储的加密密码
+      final authService = ref.read(authServiceProvider);
+      await authService.updateBiometricEnabled(false);
+      await ref
+          .read(settingsProvider.notifier)
+          .updateBiometricFullUnlock(false);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已禁用指纹完全解锁')),
+        );
+      }
+      return;
+    }
+
+    // 启用时需要验证当前主密码
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('启用指纹完全解锁'),
+        content: const Text(
+          '启用后，您可以使用指纹直接解锁应用，无需输入主密码。\n\n'
+          '为了安全，需要验证您的主密码。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('继续'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    // 使用 showMasterPasswordDialog 显示密码输入对话框
+    final password = await showMasterPasswordDialog(
+      context,
+      title: '验证主密码',
+      hintText: '请输入主密码以继续',
+      onVerify: (password) async {
+        final authService = ref.read(authServiceProvider);
+        return await authService.verifyMasterPassword(password);
+      },
+    );
+
+    if (password == null || !context.mounted) return;
+
+    // 存储加密的主密码
+    final authService = ref.read(authServiceProvider);
+    try {
+      await authService.storeEncryptedMasterPassword(password);
+      await ref.read(settingsProvider.notifier).updateBiometricFullUnlock(true);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('已启用指纹完全解锁'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('启用失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
 

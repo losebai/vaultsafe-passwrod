@@ -32,6 +32,7 @@ class SettingsNotifier extends StateNotifier<AsyncValue<AppSettings>> {
     try {
       // 从安全存储加载设置
       final biometricEnabled = await _storage.read(key: 'biometric_enabled') == 'true';
+      final biometricFullUnlock = await _storage.read(key: 'biometric_full_unlock') == 'true';
       final autoLockSeconds = int.tryParse(await _storage.read(key: 'auto_lock_timeout') ?? '60') ?? 60;
       final passwordVerificationSeconds = int.tryParse(await _storage.read(key: 'password_verification_timeout') ?? '30') ?? 30;
       final syncEnabled = await _storage.read(key: 'sync_enabled') == 'true';
@@ -74,6 +75,7 @@ class SettingsNotifier extends StateNotifier<AsyncValue<AppSettings>> {
 
       final settings = AppSettings(
         biometricEnabled: biometricEnabled,
+        biometricFullUnlock: biometricFullUnlock,
         autoLockTimeout: Duration(seconds: autoLockSeconds),
         passwordVerificationTimeout: Duration(seconds: passwordVerificationSeconds),
         syncEnabled: syncEnabled,
@@ -92,6 +94,13 @@ class SettingsNotifier extends StateNotifier<AsyncValue<AppSettings>> {
     await _storage.write(key: 'biometric_enabled', value: value.toString());
     state.whenData((settings) {
       state = AsyncValue.data(settings.copyWith(biometricEnabled: value));
+    });
+  }
+
+  Future<void> updateBiometricFullUnlock(bool value) async {
+    await _storage.write(key: 'biometric_full_unlock', value: value.toString());
+    state.whenData((settings) {
+      state = AsyncValue.data(settings.copyWith(biometricFullUnlock: value));
     });
   }
 

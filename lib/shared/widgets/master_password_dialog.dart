@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 class MasterPasswordDialog extends StatefulWidget {
   final String title;
   final String? hintText;
-  final bool Function(String password) onVerify;
+  final Future<bool> Function(String password) onVerify;
 
   const MasterPasswordDialog({
     super.key,
@@ -41,7 +41,7 @@ class _MasterPasswordDialogState extends State<MasterPasswordDialog> {
     });
 
     try {
-      final isValid = widget.onVerify(password);
+      final isValid = await widget.onVerify(password);
 
       if (isValid && mounted) {
         Navigator.of(context).pop(password);
@@ -191,7 +191,7 @@ Future<String?> showMasterPasswordDialog(
   BuildContext context, {
   String title = '输入主密码',
   String? hintText,
-  required bool Function(String password) onVerify,
+  required Future<bool> Function(String password) onVerify,
 }) {
   return showDialog<String>(
     context: context,

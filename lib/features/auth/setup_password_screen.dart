@@ -20,13 +20,48 @@ class _SetupPasswordScreenState extends ConsumerState<SetupPasswordScreen> {
   /// 表单键
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  bool _enableBiometricUnlock = false;
+  bool _biometricAvailable = false;
+  bool _isCheckingBiometric = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBiometricAvailability();
+  }
+
+  /// 检查生物识别是否可用
+  Future<void> _checkBiometricAvailability() async {
+    setState(() => _isCheckingBiometric = true);
+
+    final authService = ref.read(authServiceProvider);
+    final available = await authService.isBiometricAvailable();
+
+    if (mounted) {
+      setState(() {
+        _biometricAvailable = available;
+        _isCheckingBiometric = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('设置 VaultSafe')),
+      appBar: AppBar(
+        title: const Text('设置 VaultSafe'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Container(
+            height: 0.5,
+            decoration: BoxDecoration(
+              color: theme.dividerColor.withValues(alpha: 0.1),
+            ),
+          ),
+        ),
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -89,6 +124,18 @@ class _SetupPasswordScreenState extends ConsumerState<SetupPasswordScreen> {
                     return null;
                   },
                 ),
+                // Show biometric unlock option if available
+                if (!_isCheckingBiometric && _biometricAvailable) ...[
+                  const SizedBox(height: 16),
+                  CheckboxListTile(
+                    value: _enableBiometricUnlock,
+                    onChanged: (value) => setState(() => _enableBiometricUnlock = value ?? false),
+                    title: const Text('启用指纹直接解锁'),
+                    subtitle: const Text('启用后，可以使用指纹快速解锁，无需输入主密码'),
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.platform,
+                  ),
+                ],
                 const Spacer(),
                 FilledButton(
                   onPressed: _isLoading ? null : _setup,
@@ -117,7 +164,10 @@ class _SetupPasswordScreenState extends ConsumerState<SetupPasswordScreen> {
     setState(() => _isLoading = true);
 
     final authService = ref.read(authServiceProvider);
-    await authService.setupMasterPassword(_passwordController.text);
+    await authService.setupMasterPasswordWithBiometric(
+      _passwordController.text,
+      _enableBiometricUnlock,
+    );
 
     if (!mounted) return;
 

@@ -56,7 +56,8 @@ class AuthService {
   /// Set up master password for the first time
   Future<void> setupMasterPassword(String password) async {
     final salt = EncryptionService.generateSalt();
-    final key = EncryptionService.deriveKey(password, salt);
+    // 使用异步密钥派生，避免 UI 卡顿
+    final key = await EncryptionService.deriveKeyAsync(password, salt);
 
     // 创建一个验证器来检查密码的有效性，而不存储实际密码。
     final verifier = EncryptionService.encrypt('vaultsafe_verify', key);
@@ -72,6 +73,60 @@ class AuthService {
     );
 
     _masterKey = key;
+  }
+
+  /// Set up master password with biometric unlock support
+  Future<void> setupMasterPasswordWithBiometric(String password, bool enableBiometric) async {
+    await setupMasterPassword(password);
+
+    // 如果启用了生物识别，存储加密的主密码副本用于指纹解锁
+    if (enableBiometric) {
+      await _storeEncryptedMasterPassword(password);
+    }
+  }
+
+  /// Store encrypted master password for biometric unlock
+  Future<void> _storeEncryptedMasterPassword(String password) async {
+    // 使用当前 masterKey 加密主密码
+    final encryptedPassword = EncryptionService.encrypt(password, _masterKey!);
+
+    await _secureStorage.write(
+      key: 'encrypted_master_password',
+      value: jsonEncode(encryptedPassword.toJson()),
+    );
+  }
+
+  /// Get decrypted master password for biometric unlock
+  Future<String?> getDecryptedMasterPassword() async {
+    try {
+      final encryptedJson = await _secureStorage.read(key: 'encrypted_master_password');
+      if (encryptedJson == null) return null;
+
+      final encryptedData = jsonDecode(encryptedJson) as Map<String, dynamic>;
+      final encrypted = EncryptedData.fromJson(encryptedData);
+
+      // 使用当前的 masterKey 解密主密码
+      return EncryptionService.decrypt(encrypted, _masterKey!);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Update biometric setting and re-store encrypted password if needed
+  Future<void> updateBiometricEnabled(bool enabled) async {
+    if (!enabled) {
+      // 禁用时删除存储的加密主密码
+      await _secureStorage.delete(key: 'encrypted_master_password');
+    }
+    // 启用时会在下次主密码解锁时自动存储
+  }
+
+  /// Store encrypted master password for biometric unlock (public method for settings)
+  Future<void> storeEncryptedMasterPassword(String password) async {
+    if (_masterKey == null) {
+      throw StateError('Master key not available. User must be unlocked first.');
+    }
+    await _storeEncryptedMasterPassword(password);
   }
 
   /// 校验主密码
