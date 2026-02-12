@@ -49,6 +49,7 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final String? obscuringChar = (_obscurePassword && !_selectedType.isPasswordMultiline) ? '•' : null;
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditMode ? '编辑密码' : '添加密码'),

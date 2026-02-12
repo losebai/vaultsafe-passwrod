@@ -46,6 +46,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 border: OutlineInputBorder(),
               ),
               obscureText: true,
+              obscuringCharacter: '•',
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return '请输入当前密码';
@@ -61,6 +62,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 border: OutlineInputBorder(),
               ),
               obscureText: true,
+              obscuringCharacter: '•',
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return '请输入新密码';
@@ -79,6 +81,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 border: OutlineInputBorder(),
               ),
               obscureText: true,
+              obscuringCharacter: '•',
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return '请确认新密码';

@@ -5,6 +5,30 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.2] - 2025-02-10
+
+### 新增 ✨
+- **一键构建脚本**：提供 Windows 和 Linux/Mac 构建脚本，支持快速打包不同版本
+- **智能文件命名**：构建输出文件自动包含版本号和 CPU 架构信息
+  - APK 格式：`vaultsafe-1.0.2-arm64-v8a.apk`
+  - AAB 格式：`vaultsafe-1.0.2-universal.aab`
+
+### 优化 ⚡
+- **APK 体积优化**：通过 ABI 过滤和代码混淆，APK 体积从 ~50MB 降至 ~20MB
+- **构建流程优化**：添加循环菜单系统，可连续执行多个构建任务
+- **用户体验提升**：构建脚本提供清晰的输出信息，包含构建结果和文件路径
+
+### 修复 🐛
+- **终端编码问题**：修复 Windows 批处理脚本中文乱码，统一使用 UTF-8 编码
+- **构建脚本语法**：修复 shell 脚本中的语法错误（移除 Windows 特有的 goto/ errorlevel）
+
+### 技术改进 🔧
+- **ABI 配置优化**：仅打包 arm64-v8a 和 armeabi-v7a 两种最常见架构
+- **Gradle 配置**：启用 minifyEnabled、shrinkResources 和 ProGuard 混淆
+- **MultiDex 支持**：启用多 dex 支持大型应用
+
+---
+
 ## [1.0.1] - 2025-02-05
 
 ### 新增 ✨

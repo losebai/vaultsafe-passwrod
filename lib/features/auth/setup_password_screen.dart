@@ -96,6 +96,7 @@ class _SetupPasswordScreenState extends ConsumerState<SetupPasswordScreen> {
                     helperText: '至少 8 个字符',
                   ),
                   obscureText: true,
+                  obscuringCharacter: '•',
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return '请输入密码';
@@ -114,6 +115,7 @@ class _SetupPasswordScreenState extends ConsumerState<SetupPasswordScreen> {
                     border: OutlineInputBorder(),
                   ),
                   obscureText: true,
+                  obscuringCharacter: '•',
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return '请确认密码';

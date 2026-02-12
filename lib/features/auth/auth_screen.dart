@@ -178,6 +178,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         child: TextFormField(
                           controller: _passwordController,
                           obscureText: _obscurePassword,
+                          obscuringCharacter: '•',
                           textAlign: TextAlign.center,
                           decoration: InputDecoration(
                             labelText: '主密码',

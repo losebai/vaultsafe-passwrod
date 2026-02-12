@@ -75,7 +75,7 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingsItem(
                       icon: Icons.timer_outlined,
                       title: '自动锁定',
-                      description: _formatTimeout(settings.autoLockTimeout),
+                      description: '${_formatTimeout(settings.autoLockTimeout)} - 不操作时自动锁定',
                       onTap: () => _showTimeoutDialog(
                           context, ref, settings.autoLockTimeout),
                     ),
@@ -83,7 +83,7 @@ class SettingsScreen extends ConsumerWidget {
                       icon: Icons.verified_user_outlined,
                       title: '密码验证超时',
                       description:
-                          _formatTimeout(settings.passwordVerificationTimeout),
+                          '${_formatTimeout(settings.passwordVerificationTimeout)} - 敏感操作需验证',
                       onTap: () => _showPasswordVerificationTimeoutDialog(
                           context, ref, settings.passwordVerificationTimeout),
                     ),
@@ -1521,6 +1521,18 @@ class _VersionInfoCardState extends ConsumerState<_VersionInfoCard> {
                 const SizedBox(height: 4),
                 Text(
                   '构建号: ${_packageInfo!.buildNumber}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  '作者: bai',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  'QQ: loserbai',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),

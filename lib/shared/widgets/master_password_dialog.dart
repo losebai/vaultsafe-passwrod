@@ -132,6 +132,7 @@ class _MasterPasswordDialogState extends State<MasterPasswordDialog> {
             TextFormField(
               controller: _passwordController,
               obscureText: _obscurePassword,
+              obscuringCharacter: '•',
               enabled: !_isLoading,
               autofocus: true,
               decoration: InputDecoration(
