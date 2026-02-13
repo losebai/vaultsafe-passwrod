@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultsafe/features/auth/setup_password_screen.dart';
 import 'package:vaultsafe/main.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
+import 'package:vaultsafe/shared/providers/settings_provider.dart';
+import 'package:vaultsafe/core/security/password_verification_service.dart';
 
 
 /// 认证界面 - 处理主密码输入和生物识别
@@ -24,7 +26,21 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   @override
   void initState() {
     super.initState();
-    _checkBiometrics();
+    _checkAutoUnlock();
+  }
+
+  /// 检查是否需要自动解锁（在有效期内直接进入）
+  Future<void> _checkAutoUnlock() async {
+    final authService = ref.read(authServiceProvider);
+    final settingsAsync = ref.read(settingsProvider);
+    final settings = settingsAsync.valueOrNull;
+
+    if (settings != null && authService.isUnlockValid(settings.autoLockTimeout)) {
+      if (!mounted) return;
+      _navigateToHome();
+    } else {
+      await _checkBiometrics();
+    }
   }
 
   Future<void> _checkBiometrics() async {
@@ -58,6 +74,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           setState(() => _isLoading = false);
 
           if (success) {
+            // 标记密码验证服务为已验证，解锁后在宽限期内不需要二次验证
+            ref.read(passwordVerificationServiceProvider).markAsVerified();
             _navigateToHome();
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -96,6 +114,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     setState(() => _isLoading = false);
 
     if (success) {
+      // 标记密码验证服务为已验证，解锁后在宽限期内不需要二次验证
+      ref.read(passwordVerificationServiceProvider).markAsVerified();
       _navigateToHome();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -171,10 +191,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     ),
                     const SizedBox(height: 48),
 
-                    // 密码输入框 - 35% 宽度，居中
+                    // 密码输入框 - 75% 宽度，居中
                     Center(
                       child: SizedBox(
-                        width: size.width * 0.35,
+                        width: size.width * 0.75,
                         child: TextFormField(
                           controller: _passwordController,
                           obscureText: _obscurePassword,
@@ -223,10 +243,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     ),
                     const SizedBox(height: 32),
 
-                    // 解锁按钮 - 35% 宽度
+                    // 解锁按钮 - 75% 宽度
                     Center(
                       child: SizedBox(
-                        width: size.width * 0.35,
+                        width: size.width * 0.75,
                         child: FilledButton(
                           onPressed: _isLoading ? null : _unlock,
                           style: FilledButton.styleFrom(

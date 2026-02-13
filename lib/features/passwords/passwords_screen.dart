@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:vaultsafe/shared/providers/password_provider.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
+import 'package:vaultsafe/shared/providers/settings_provider.dart';
 import 'package:vaultsafe/shared/models/password_entry.dart';
 import 'package:vaultsafe/shared/models/password_entry_type.dart';
 import 'package:vaultsafe/shared/models/password_group.dart';
@@ -166,7 +167,13 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: () => _toggleRightPanel(),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const AddPasswordScreen(),
+                ),
+              );
+            },
             tooltip: '添加',
           ),
         ],
@@ -357,16 +364,6 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                           ),
                         ),
                         const Spacer(),
-                        if (_isEditMode)
-                          IconButton(
-                            icon: const Icon(Icons.close),
-                            onPressed: () {
-                              setState(() {
-                                _isEditMode = false;
-                              });
-                            },
-                            tooltip: '取消编辑',
-                          ),
                         IconButton(
                           icon: const Icon(Icons.close),
                           onPressed: () => _closeRightPanel(),
@@ -416,18 +413,32 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
     });
   }
 
-  // 打开密码编辑（需要验证）
+  // 打开密码编辑（在解锁有效期内不需要验证）
   Future<void> _openPasswordEdit(PasswordEntry entry) async {
-    // 验证主密码
-    final verified = await requestPasswordVerification(
-      context,
-      ref,
-      reason: '编辑密码',
-    );
+    // 检查是否在解锁有效期内（使用密码验证超时设置）
+    final authService = ref.read(authServiceProvider);
+    final settingsAsync = ref.read(settingsProvider);
+    final settings = settingsAsync.valueOrNull;
 
-    if (!verified || !mounted) {
-      return; // 验证失败或取消
+    bool needsVerification = true;
+    if (settings != null && authService.isUnlockValid(settings.passwordVerificationTimeout)) {
+      needsVerification = false;
     }
+
+    // 如果需要验证，则请求验证
+    if (needsVerification) {
+      final verified = await requestPasswordVerification(
+        context,
+        ref,
+        reason: '编辑密码',
+      );
+
+      if (!verified || !mounted) {
+        return; // 验证失败或取消
+      }
+    }
+
+    if (!mounted) return;
 
     setState(() {
       _selectedEntry = entry;
@@ -587,18 +598,32 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
         if (_isSelectionMode) {
           _toggleSelection(entry.id);
         } else {
-          // 验证后进入编辑模式
-          final verified = await requestPasswordVerification(
-            context,
-            ref,
-            reason: '编辑密码',
-          );
+          // 检查是否在解锁有效期内（使用密码验证超时设置）
+          final authService = ref.read(authServiceProvider);
+          final settingsAsync = ref.read(settingsProvider);
+          final settings = settingsAsync.valueOrNull;
 
-          if (!verified || !mounted) return;
+          bool needsVerification = true;
+          if (settings != null && authService.isUnlockValid(settings.passwordVerificationTimeout)) {
+            needsVerification = false;
+          }
+
+          // 如果需要验证，则请求验证
+          if (needsVerification) {
+            final verified = await requestPasswordVerification(
+              context,
+              ref,
+              reason: '编辑密码',
+            );
+
+            if (!verified || !mounted) return;
+          }
+
+          if (!mounted) return;
 
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => AddPasswordScreen(entry: entry),
+              builder: (_) => PasswordDetailScreen(entry: entry),
             ),
           );
         }

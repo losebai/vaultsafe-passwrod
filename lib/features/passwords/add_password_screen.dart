@@ -42,8 +42,32 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
     _titleController = TextEditingController(text: widget.entry?.title ?? '');
     _websiteController = TextEditingController(text: widget.entry?.website ?? '');
     _usernameController = TextEditingController(text: widget.entry?.username ?? '');
-    _passwordController = TextEditingController(text: '');
+    _passwordController = TextEditingController();
     _notesController = TextEditingController(text: widget.entry?.notes ?? '');
+
+    // 如果是编辑模式，解密并显示当前密码
+    if (_isEditMode) {
+      _decryptPassword();
+    }
+  }
+
+  /// 解密密码（编辑模式）
+  Future<void> _decryptPassword() async {
+    if (widget.entry == null) return;
+
+    try {
+      final authService = ref.read(authServiceProvider);
+      final masterKey = authService.masterKey;
+
+      if (masterKey != null) {
+        final decrypted = EncryptionService.decrypt(widget.entry!.encryptedPassword, masterKey);
+        if (mounted) {
+          _passwordController.text = decrypted;
+        }
+      }
+    } catch (e) {
+      debugPrint('解密失败: $e');
+    }
   }
 
   @override

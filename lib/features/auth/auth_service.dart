@@ -13,8 +13,18 @@ class AuthService {
   static bool _isInitialized = false;
 
   Uint8List? _masterKey;
+  DateTime? _lastUnlockTime;
 
   Uint8List? get masterKey => _masterKey;
+
+  /// 检查是否仍在解锁有效期内
+  bool isUnlockValid(Duration timeout) {
+    if (_lastUnlockTime == null) return false;
+    if (_masterKey == null) return false;
+
+    final elapsed = DateTime.now().difference(_lastUnlockTime!);
+    return elapsed < timeout;
+  }
 
   // 私有构造，防止外部直接 new
   AuthService._internal();
@@ -156,6 +166,7 @@ class AuthService {
 
       if (decrypted == 'vaultsafe_verify') {
         _masterKey = key;
+        _lastUnlockTime = DateTime.now(); // 记录解锁时间
         return true;
       }
 
@@ -200,6 +211,7 @@ class AuthService {
   /// Lock the vault
   void lock() {
     _masterKey = null;
+    _lastUnlockTime = null;
   }
 
   /// Check if vault is unlocked

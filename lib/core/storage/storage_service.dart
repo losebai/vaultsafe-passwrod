@@ -1,11 +1,12 @@
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
 import 'dart:io';
-import 'package:vaultsafe/shared/models/password_entry.dart';
-import 'package:vaultsafe/shared/models/password_group.dart';
+import 'dart:typed_data';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 import 'package:vaultsafe/core/encryption/encryption_service.dart';
 import 'package:vaultsafe/core/logging/log_service.dart';
+import 'package:vaultsafe/shared/models/password_entry.dart';
+import 'package:vaultsafe/shared/models/password_group.dart';
 
 /// 使用 Hive 进行本地加密数据持久化的存储服务
 class StorageService {
@@ -329,6 +330,87 @@ class StorageService {
           await saveGroup(group);
         } catch (e) {
           // 跳过无效条目
+          continue;
+        }
+      }
+    }
+  }
+
+  /// 从 JSON 导入数据并重新加密所有密码条目
+  ///
+  /// 用于跨设备同步场景：备份数据是用不同主密码加密的
+  /// 导入时需要：
+  /// 1. 用 [backupKey] 解密每个密码条目的明文密码
+  /// 2. 用本地 [newKey] 重新加密
+  ///
+  /// 参数:
+  /// - data: 从备份解密后的 JSON 数据
+  /// - backupKey: 备份时使用的加密密钥（用于解密）
+  /// - newKey: 本地新的加密密钥（用于重新加密）
+  /// - onProgress: 进度回调，返回已处理的密码数量
+  Future<void> importDataWithReEncryption(
+    Map<String, dynamic> data,
+    Uint8List backupKey,
+    Uint8List newKey, {
+    Function(int processed, int total)? onProgress,
+  }) async {
+    _ensureInitialized();
+
+    final version = data['version'] as String?;
+    if (version != '1.0') {
+      throw Exception('Unsupported backup version: $version');
+    }
+
+    // 导入并重新加密密码
+    final passwordsJson = data['passwords'] as List<dynamic>?;
+    if (passwordsJson != null) {
+      final total = passwordsJson.length;
+      int processed = 0;
+
+      for (final json in passwordsJson) {
+        try {
+          final entry = PasswordEntry.fromJson(
+            Map<String, dynamic>.from(json as Map),
+          );
+
+          // 1. 用备份密钥解密密码
+          final decryptedPassword = EncryptionService.decrypt(
+            entry.encryptedPassword,
+            backupKey,
+          );
+
+          // 2. 用新密钥重新加密
+          final newEncrypted = EncryptionService.encrypt(decryptedPassword, newKey);
+
+          // 3. 创建新的条目，使用重新加密的数据
+          final reEncryptedEntry = entry.copyWith(
+            encryptedPassword: newEncrypted,
+            updatedAt: DateTime.now(),
+          );
+
+          await savePasswordEntry(reEncryptedEntry);
+
+          processed++;
+          onProgress?.call(processed, total);
+        } catch (e, stackTrace) {
+          log.e('重新加密密码条目失败: ${json['id']}', source: 'StorageService', error: e, stackTrace: stackTrace);
+          // 跳过无效条目
+          continue;
+        }
+      }
+    }
+
+    // 导入分组（分组不需要加密）
+    final groupsJson = data['groups'] as List<dynamic>?;
+    if (groupsJson != null) {
+      for (final json in groupsJson) {
+        try {
+          final group = PasswordGroup.fromJson(
+            Map<String, dynamic>.from(json as Map),
+          );
+          await saveGroup(group);
+        } catch (e) {
+          log.e('导入分组失败: ${json['id']}', source: 'StorageService', error: e);
           continue;
         }
       }

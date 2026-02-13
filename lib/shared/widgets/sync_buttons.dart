@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:vaultsafe/core/logging/log_service.dart';
 import 'package:vaultsafe/shared/providers/settings_provider.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
 import 'package:vaultsafe/shared/providers/password_provider.dart';
@@ -375,19 +376,21 @@ class SyncButtonsState extends ConsumerState<SyncButtons> {
 
       // 4. 尝试解密数据
       String decryptedJson;
+      Uint8List? backupKey; // 备份时使用的密钥（用于重新加密）
       bool useCustomPassword = false;
 
       // 如果备份中有 salt，使用备份的 salt（跨设备同步）
       if (backupSalt != null) {
-        final decrypted = await _decryptWithBackupSalt(encrypted, backupSalt, backupData);
-        if (decrypted == null || !mounted) {
+        final decryptedWithKey = await _decryptWithBackupSaltAndKey(encrypted, backupSalt, backupData);
+        if (decryptedWithKey == null || !mounted) {
           setState(() {
             _isSyncing = false;
             _isDownloading = false;
           });
           return;
         }
-        decryptedJson = decrypted;
+        decryptedJson = decryptedWithKey.json;
+        backupKey = decryptedWithKey.backupKey;
       } else {
         // 旧版本备份没有 salt，使用本地方式
         final authService = ref.read(authServiceProvider);
@@ -452,7 +455,75 @@ class SyncButtonsState extends ConsumerState<SyncButtons> {
       final storageService = ref.read(storageServiceProvider);
 
       try {
-        await storageService.importData(data);
+        // 获取本地主密钥
+        final authService = ref.read(authServiceProvider);
+        final localMasterKey = authService.masterKey;
+
+        if (localMasterKey == null) {
+          throw Exception('请先设置本地主密码');
+        }
+
+        // 如果有备份密钥（与本地密钥不同），需要重新加密所有密码
+        if (backupKey != null) {
+          // 检查密钥是否相同
+          bool keysAreEqual = backupKey.length == localMasterKey.length;
+          if (keysAreEqual) {
+            for (int i = 0; i < backupKey.length; i++) {
+              if (backupKey[i] != localMasterKey[i]) {
+                keysAreEqual = false;
+                break;
+              }
+            }
+          }
+
+          if (!keysAreEqual) {
+            // 密钥不同，需要重新加密
+            log.i('密钥不同，将重新加密所有密码条目', source: 'SyncButtons');
+
+            // 显示进度对话框
+            if (!mounted) return;
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => AlertDialog(
+                title: const Text('正在处理数据'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Text('正在重新加密 ${data['passwords']?.length ?? 0} 个密码条目...\n这可能需要几分钟时间'),
+                  ],
+                ),
+              ),
+            );
+
+            try {
+              await storageService.importDataWithReEncryption(
+                data,
+                backupKey,
+                localMasterKey,
+                onProgress: (processed, total) {
+                  // 可以在这里更新进度
+                  log.d('重新加密进度: $processed/$total', source: 'SyncButtons');
+                },
+              );
+
+              // 关闭进度对话框
+              if (mounted) Navigator.of(context).pop();
+            } catch (e) {
+              // 关闭进度对话框
+              if (mounted) Navigator.of(context).pop();
+              rethrow;
+            }
+          } else {
+            // 密钥相同，直接导入
+            await storageService.importData(data);
+          }
+        } else {
+          // 没有备份密钥，直接导入
+          await storageService.importData(data);
+        }
       } catch (e) {
         throw Exception('导入数据失败: ${e.toString()}');
       }
@@ -549,8 +620,9 @@ class SyncButtonsState extends ConsumerState<SyncButtons> {
     return EncryptionService.decrypt(encrypted, customKey);
   }
 
-  /// 使用备份中的 salt 解密数据（跨设备同步）
-  Future<String?> _decryptWithBackupSalt(
+  /// 使用备份中的 salt 解密数据并返回密钥
+  /// 返回解密后的 JSON 字符串和备份密钥（用于重新加密）
+  Future<_DecryptedDataWithKey?> _decryptWithBackupSaltAndKey(
     EncryptedData encrypted,
     String backupSalt,
     Map<String, dynamic> backupData,
@@ -588,6 +660,22 @@ class SyncButtonsState extends ConsumerState<SyncButtons> {
 
     // 使用主密码和备份的 salt 解密（异步）
     final backupKey = await EncryptionService.deriveKeyAsync(masterPassword, saltBytes);
-    return EncryptionService.decrypt(encrypted, backupKey);
+    final decryptedJson = EncryptionService.decrypt(encrypted, backupKey);
+
+    return _DecryptedDataWithKey(
+      json: decryptedJson,
+      backupKey: backupKey,
+    );
   }
+}
+
+/// 解密数据和密钥的包装类
+class _DecryptedDataWithKey {
+  final String json;
+  final Uint8List backupKey;
+
+  _DecryptedDataWithKey({
+    required this.json,
+    required this.backupKey,
+  });
 }
