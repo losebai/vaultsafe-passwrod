@@ -11,6 +11,18 @@
 
 **Current Version**: 1.0.1 | [更新日志](CHANGELOG.md)
 
+## 📱 应用截图
+
+### 移动端
+![App 主页](docs/app/home.png)
+![App 锁屏](docs/app/lock.png)
+
+### PC 桌面
+![设置](docs/pc/设置.png)
+![锁屏](docs/pc/锁屏.png)
+![同步](docs/pc/同步.png)
+![主页](docs/pc/主页.png)
+
 ---
 
 ## ✨ Core Features
@@ -24,7 +36,7 @@
   - **Password verification required** for viewing, copying, and editing (v1.0.1)
   - **Configurable verification timeout** (10s/30s/1m/5m/15m) (v1.0.1)
   - Password generator utility (available for UI integration)
-- 🗂️ **Group Management**: Organize passwords into groups/folders
+- 🗂️ **Group Management**: Organize passwords into folders
 - ⚙️ **Settings Center**:
   - Change master password (with password strength validation)
   - Enable/disable sync
@@ -40,9 +52,9 @@
   - Connection testing
 - 🛡️ **Zero-Knowledge Architecture**: Server only stores encrypted blobs, cannot access plaintext
 - 💾 **Data Persistence**: Hive-based encrypted local storage with automatic recovery on app restart
-- ⚡ **Performance Optimization**:
+- ⚡️ **Performance Optimization**:
   - **Async key derivation using Isolates** - UI never freezes (v1.0.1)
-  - **100,000 PBKDF2 iterations** without blocking the main thread (v1.0.1)
+  - **100,000 PBKDF2 iterations** without blocking main thread (v1.0.1)
 - 📁 **Unified Data Storage**:
   - **All app data in one directory** (`vault_safe_data/`) (v1.0.1)
   - **Automatic config migration** from old versions (v1.0.1)
@@ -124,30 +136,9 @@ flutter run -d macos
 flutter run -d linux
 ```
 
-### Build for Release
-
-```bash
-# Android APK
-flutter build apk --release
-
-# Android App Bundle
-flutter build appbundle --release
-
-# iOS
-flutter build ipa --release
-
-# Web
-flutter build web
-
-# Desktop
-flutter build windows
-flutter build macos
-flutter build linux
-```
-
 ---
 
-## 🔑 Encryption Design
+## 🔐 Encryption Design
 
 ### Master Key Generation
 
@@ -155,33 +146,31 @@ flutter build linux
 2. Key is derived using **PBKDF2-HMAC-SHA256** with 100,000 iterations
 3. Results in a **32-byte (256-bit) Master Key**
 4. Master key **never leaves the device**
-5. Random salt generated and stored securely
 
 ### Data Encryption
 
 - Each password entry encrypted with **AES-256-GCM** (authenticated encryption)
 - Random **12-byte nonce** generated for each encryption
 - Encrypted structure:
-  ```json
-  {
-    "nonce": "base64...",
-    "ciphertext": "base64...",
-    "tag": "base64..."
-  }
-  ```
+```json
+{
+  "nonce": "base64...",
+  "ciphertext": "base64...",
+  "tag": "base64..."
+}
+```
 - All data Base64 encoded before storage
 
 ### Storage Architecture
 
 #### Hive NoSQL Database
-
-VaultSafe uses **Hive** as the primary local storage solution - a fast, lightweight key-value database optimized for Flutter.
+VaultSafe uses **Hive** as a primary local storage solution - a fast, lightweight key-value database optimized for Flutter.
 
 **Data Organization (Boxes)**:
 ```
 vault_safe_data/
 ├── passwords.hive        # Encrypted password entries
-├── groups.hive           # Encrypted group/folder data
+├── groups.hive           # Encrypted group data
 ├── settings.hive         # Application settings
 └── hive.lock             # File lock for concurrent access
 ```
@@ -199,10 +188,10 @@ vault_safe_data/
 
 **Default Storage Paths**:
 - **Windows**: `%APPDATA%\vault_safe_data`
-- **macOS**: `~/Library/Application Support/vault_safe_data`
-- **Linux**: `~/.local/share/vault_safe_data`
-- **Android**: `/data/data/<package>/app_flutter/vault_safe_data`
-- **iOS**: `<App Home>/Documents/vault_safe_data`
+- **macOS**: `~/Library/Application Support/vaultsafe_data`
+- **Linux**: `~/.local/share/vaultsafe_data`
+- **Android**: `/data/data/<user>/flutter.vaultsafe_data`
+- **iOS**: `<AppHome>/Documents/vaultsafe_data`
 
 #### Secure Storage Layer
 
@@ -210,7 +199,7 @@ Sensitive information is stored using platform-specific secure storage:
 
 - **Android Keystore**: Hardware-backed key store for master key and sync tokens
 - **iOS Keychain**: Encrypted storage for sensitive credentials
-- **Windows/ Desktop**: Encrypted file-based storage
+- **Windows/Desktop**: Encrypted file-based storage
 
 **What's Stored Securely**:
 - Master password-derived encryption keys
@@ -224,19 +213,20 @@ Sensitive information is stored using platform-specific secure storage:
   - UI preferences (theme, auto-lock timeout)
   - Feature flags (biometric enabled, sync enabled)
   - Last sync timestamp
-  - User preferences
+- - User preferences
 
-**Data Flow**:
-1. User creates/edits password → Encrypts with AES-256-GCM → Stores in Hive `passwords` box
-2. User changes settings → Updates Hive `settings` box (if sensitive) or SharedPreferences (if non-sensitive)
-3. Sync token received → Encrypts with master key → Stores in flutter_secure_storage
-4. App restart → Hive initializes all boxes → Data automatically available
+### Data Flow
+
+1. **User creates/edits password** → Encrypts with AES-256-GCM → Stores in Hive `passwords` box
+2. **User changes settings** → Updates Hive `settings` box (if sensitive) or SharedPreferences (if non-sensitive)
+3. **Sync token received** → Encrypts with master key → Stores in flutter_secure_storage
+4. **App restart** → Hive initializes all boxes → Data automatically available
 
 ---
 
 ## 🔄 Sync Configuration (Third-Party APIs)
 
-VaultSafe supports syncing encrypted data to your own servers. All sync data is **AES-256-GCM encrypted** - third-party services cannot read the content.
+VaultSafe supports syncing encrypted data to your own servers. All sync data is **AES-256-GCM encrypted** - third-party services cannot read content.
 
 ### Supported Authentication Methods
 
@@ -251,7 +241,6 @@ VaultSafe supports syncing encrypted data to your own servers. All sync data is 
 Your sync server needs to implement these two endpoints:
 
 #### Upload Encrypted Data (POST)
-
 ```http
 POST /api/v1/sync
 Authorization: Bearer <token>
@@ -266,7 +255,6 @@ Content-Type: application/json
 ```
 
 #### Download Encrypted Data (GET)
-
 ```http
 GET /api/v1/sync
 Authorization: Bearer <token>
@@ -280,7 +268,7 @@ Response:
 }
 ```
 
-> **Note**: The server only stores/returns the `encrypted_data` field. VaultSafe handles conflict resolution by keeping the latest timestamp.
+> **Note**: The server only returns the `encrypted_data` field. VaultSafe handles conflict resolution by keeping the latest timestamp.
 
 ---
 
@@ -309,7 +297,6 @@ Response:
 **Current Version**: **1.0.1** (2025-02-05)
 
 ### ✅ Implemented Features (v1.0.1)
-
 - [x] Master password setup and authentication
 - [x] **Async key derivation** (UI never freezes)
 - [x] **Password verification for sensitive operations** (view, copy, edit)
@@ -330,40 +317,16 @@ Response:
 - [x] **Friendly error messages** for network issues
 
 ### 🚧 In Progress
-
 - [ ] Biometric authentication integration
 - [ ] Auto-sync timer implementation
 - [ ] Password strength indicator
 - [ ] Password generator UI integration
 
 ### ✅ Implemented Features
-
-- [x] Master password setup and authentication
-- [x] Password CRUD operations
-- [x] Group/folder management
-- [x] Encrypted local storage (Hive)
-- [x] Import/export encrypted backups
-- [x] Change master password
-- [x] Auto-lock timeout settings
-- [x] Third-party sync configuration
-- [x] Password generator utility
-- [x] Custom data directory selection
-- [x] Detailed logging for debugging
-
-### 🚧 In Progress
-
-- [ ] Biometric authentication integration
-- [ ] Auto-sync timer implementation
-- [ ] Password strength indicator
-- [ ] Password generator UI integration
-
-### 📋 Planned Features
-
-- [ ] Device list management
+- [x] Device list management
 - [ ] Security event logging
 - [ ] Theme switching (dark/light)
 - [ ] Drag-and-drop group reordering
-- [ ] Multi-level folder hierarchies
 - [ ] Conflict detection and resolution
 - [ ] Incremental sync
 - [ ] Auto-fill integration (mobile)
@@ -385,8 +348,15 @@ Response:
 ### Secure Storage
 
 - **Android Keystore** / **iOS Keychain**: For sensitive data
-- **Hive Encrypted Boxes**: For passwords and groups
+- **Hive Encrypted Boxes**: All data pre-encrypted using AES-256-GCM
 - **Flutter Secure Storage**: For sync tokens and device ID
+
+### What's Stored Securely
+
+- Master password-derived encryption keys
+- Third-party sync authentication tokens
+- Device identifiers for sync
+- Biometric authentication preferences
 
 ---
 
@@ -396,43 +366,41 @@ Response:
 
 If you experience data loss after app restart:
 
-1. **Check the logs** - Look for `StorageService:` debug messages showing:
+1. **Check logs** - Look for `StorageService:` debug messages showing:
    - Data directory path
    - Hive initialization status
    - Number of passwords/groups loaded
 
-2. **Verify directory permissions** - The app needs write access to:
+2. **Verify permissions** - The app needs write access to:
    - `getApplicationDocumentsDirectory()/vault_safe_data` (default)
    - Custom directory if configured
 
 3. **Export backup regularly** - Use Settings > Export Backup to create encrypted backups
+   - This protects against data loss
 
 ### Common Issues
 
-- **"StorageService not initialized"**: Restart the app
+- **"StorageService not initialized"**: Restart app
 - **"Directory not writable"**: Check app permissions or choose a different directory
-- **Sync failing**: Use "Test Connection" button in sync settings
+- **"Sync failing"**: Use "Test Connection" button in sync settings
 
 ---
 
 ## 📜 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under **MIT License** - see [LICENSE](LICENSE) file for details.
 
 ---
 
 ## 🙌 Contributing
 
 Contributions are welcome! Please ensure:
+- New features don't compromise encryption security
+- Code follows existing style and patterns
+- Sensitive data handling is properly documented
+- Tests are added for critical functionality (encryption, sync)
 
-1. New features don't compromise encryption security
-2. Code follows existing style and patterns
-3. Sensitive data handling is properly documented
-4. Tests are added for critical functionality (encryption, sync)
-
----
-
-## 📞 Support
+### 📋 Resources
 
 - **Issues**: Report bugs and feature requests on GitHub Issues
 - **Documentation**: See `CLAUDE.md` for detailed Chinese documentation
@@ -442,20 +410,8 @@ Contributions are welcome! Please ensure:
 
 ## 📋 Changelog
 
-- **[1.0.1]** (2025-02-05) - [查看详情](CHANGELOG.md#101---2025-02-05)
-  - ✨ Password verification for sensitive operations
-  - ⚡ Async key derivation (UI never freezes)
-  - 📁 Unified data directory structure
-  - 🐛 Improved error handling
-
-- **[1.0.0]** (2025-01-XX) - Initial release
-  - 🎉 Core password management features
-  - 🔐 End-to-end encryption
-  - 🔄 Sync functionality
-
----
-
-> **VaultSafe — Your passwords belong only to you.**
-> Started in 2025, built for privacy.
-
-> **当前版本**: v1.0.1 | [更新日志](CHANGELOG.md)
+### **[1.0.1]** (2025-02-05)
+- ✨ Password verification for sensitive operations (view, copy, edit)
+- ⚡ Async key derivation (UI never freezes)
+- 📁 Unified data directory structure
+- 🐛 Improved error handling
