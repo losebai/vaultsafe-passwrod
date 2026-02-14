@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
+import 'package:vaultsafe/core/security/password_verification_service.dart';
 
 /// 修改主密码界面
 class ChangePasswordScreen extends ConsumerStatefulWidget {
@@ -114,6 +115,17 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
 
   Future<void> _changePassword() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // 修改主密码前强制验证主密码（不支持生物识别）
+    final verified = await requestMasterPasswordVerification(
+      context,
+      ref,
+      reason: '修改主密码',
+    );
+
+    if (!verified || !mounted) {
+      return; // 验证失败或取消
+    }
 
     setState(() => _isLoading = true);
 

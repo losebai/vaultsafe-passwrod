@@ -14,14 +14,24 @@
 ## 📱 应用截图
 
 ### 移动端
-![App 主页](docs/app/home.png)
-![App 锁屏](docs/app/lock.png)
+<table>
+  <tr>
+    <td><img src="docs/app/home.png" alt="App 主页" width="200"/></td>
+    <td><img src="docs/app/lock.png" alt="App 锁屏" width="200"/></td>
+  </tr>
+</table>
 
 ### PC 桌面
-![设置](docs/pc/设置.png)
-![锁屏](docs/pc/锁屏.png)
-![同步](docs/pc/同步.png)
-![主页](docs/pc/主页.png)
+<table>
+  <tr>
+    <td><img src="docs/pc/设置.png" alt="设置" width="300"/></td>
+    <td><img src="docs/pc/锁屏.png" alt="锁屏" width="300"/></td>
+  </tr>
+  <tr>
+    <td><img src="docs/pc/同步.png" alt="同步" width="300"/></td>
+    <td><img src="docs/pc/主页.png" alt="主页" width="300"/></td>
+  </tr>
+</table>
 
 ---
 

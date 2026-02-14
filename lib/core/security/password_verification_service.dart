@@ -6,6 +6,7 @@ import 'package:vaultsafe/shared/providers/auth_provider.dart';
 import 'package:vaultsafe/shared/widgets/master_password_dialog.dart';
 import 'package:vaultsafe/core/encryption/encryption_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:local_auth/local_auth.dart';
 import 'dart:typed_data';
 
 /// 密码验证服务 - 管理敏感操作时的主密码验证
@@ -67,8 +68,51 @@ class PasswordVerificationService {
       return true;
     }
 
-    // 需要验证，显示密码输入对话框
+    // 需要验证，尝试使用生物识别（如果启用了指纹完全解锁）
+    return await _performVerification(context, ref, settings, reason);
+  }
+
+  /// 执行验证（支持指纹完全解锁）
+  Future<bool> _performVerification(
+    BuildContext context,
+    WidgetRef ref,
+    dynamic settings,
+    String? reason,
+  ) async {
+    // 如果启用了指纹完全解锁，优先使用生物识别
+    if (settings?.biometricFullUnlock == true) {
+      final biometricVerified = await _tryBiometricVerification();
+      if (biometricVerified) {
+        markAsVerified();
+        return true;
+      }
+      // 生物识别失败/取消，继续尝试主密码验证
+    }
+
+    // 检查 context 是否仍然有效
+    if (!context.mounted) {
+      return false;
+    }
+
+    // 使用主密码验证
     return await _showVerificationDialog(context, ref, reason);
+  }
+
+  /// 尝试使用生物识别验证
+  Future<bool> _tryBiometricVerification() async {
+    try {
+      final localAuth = LocalAuthentication();
+      final isAuthenticated = await localAuth.authenticate(
+        localizedReason: '请验证以继续操作',
+        options: const AuthenticationOptions(
+          biometricOnly: true,
+          stickyAuth: true,
+        ),
+      );
+      return isAuthenticated;
+    } catch (e) {
+      return false;
+    }
   }
 
   /// 显示验证对话框
@@ -140,6 +184,20 @@ class PasswordVerificationService {
     }
     return true;
   }
+
+  /// 强制请求主密码验证（不支持生物识别）
+  /// 用于修改主密码等必须使用主密码的场景
+  Future<bool> requestMasterPasswordOnly(
+    BuildContext context,
+    WidgetRef ref, {
+    String? reason,
+  }) async {
+    // 直接显示主密码验证对话框，跳过生物识别
+    if (!context.mounted) {
+      return false;
+    }
+    return await _showVerificationDialog(context, ref, reason);
+  }
 }
 
 /// PasswordVerificationService 的 Provider
@@ -155,6 +213,7 @@ final passwordVerificationServiceProvider = Provider<PasswordVerificationService
 
 /// 辅助函数：请求密码验证
 /// 用于在敏感操作前验证用户身份
+/// 如果启用了指纹完全解锁，会优先使用生物识别
 Future<bool> requestPasswordVerification(
   BuildContext context,
   WidgetRef ref, {
@@ -162,4 +221,15 @@ Future<bool> requestPasswordVerification(
 }) async {
   final service = ref.read(passwordVerificationServiceProvider);
   return await service.requestVerification(context, ref, reason: reason);
+}
+
+/// 辅助函数：强制请求主密码验证（不支持生物识别）
+/// 用于修改主密码等必须使用主密码的场景
+Future<bool> requestMasterPasswordVerification(
+  BuildContext context,
+  WidgetRef ref, {
+  String? reason,
+}) async {
+  final service = ref.read(passwordVerificationServiceProvider);
+  return await service.requestMasterPasswordOnly(context, ref, reason: reason);
 }

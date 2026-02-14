@@ -9,7 +9,6 @@ import 'package:vaultsafe/shared/providers/password_provider.dart';
 import 'package:vaultsafe/shared/platform/platform_service.dart';
 import 'package:vaultsafe/core/logging/log_service.dart';
 import 'package:vaultsafe/core/security/password_verification_service.dart';
-import 'package:vaultsafe/shared/providers/settings_provider.dart';
 
 /// 密码详情界面 - 显示和复制密码
 class PasswordDetailScreen extends ConsumerStatefulWidget {
@@ -295,32 +294,18 @@ class _PasswordDetailScreenState extends ConsumerState<PasswordDetailScreen> {
     }
   }
 
-  /// 编辑密码（在解锁有效期内不需要验证）
+  /// 编辑密码（需要验证）
   Future<void> _editPassword() async {
-    // 检查是否在解锁有效期内（使用密码验证超时设置）
-    final authService = ref.read(authServiceProvider);
-    final settingsAsync = ref.read(settingsProvider);
-    final settings = settingsAsync.valueOrNull;
+    // 使用统一的验证接口，自动支持指纹完全解锁
+    final verified = await requestPasswordVerification(
+      context,
+      ref,
+      reason: '编辑密码',
+    );
 
-    bool needsVerification = true;
-    if (settings != null && authService.isUnlockValid(settings.passwordVerificationTimeout)) {
-      needsVerification = false;
+    if (!verified || !mounted) {
+      return; // 验证失败或取消
     }
-
-    // 如果需要验证，则请求验证
-    if (needsVerification) {
-      final verified = await requestPasswordVerification(
-        context,
-        ref,
-        reason: '编辑密码',
-      );
-
-      if (!verified || !mounted) {
-        return; // 验证失败或取消
-      }
-    }
-
-    if (!mounted) return;
 
     Navigator.of(context).push(
       MaterialPageRoute(

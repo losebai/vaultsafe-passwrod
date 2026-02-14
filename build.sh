@@ -17,17 +17,48 @@ fi
 while true; do
     echo ""
     echo "Please select build type:"
-    echo "[1] APK - arm64-v8a (Recommended, ~20MB)"
-    echo "[2] APK - armeabi-v7a (32-bit devices)"
-    echo "[3] App Bundle (All architectures, optimized)"
-    echo "[4] Clean build cache"
-    echo "[5] Exit"
+    echo "[1] Windows - x64 (Desktop)"
+    echo "[2] APK - arm64-v8a (Recommended, ~20MB)"
+    echo "[3] APK - armeabi-v7a (32-bit devices)"
+    echo "[4] App Bundle (All architectures, optimized)"
+    echo "[5] Clean build cache"
+    echo "[6] Exit"
     echo ""
 
-    read -p "Enter your choice (1-5): " choice
+    read -p "Enter your choice (1-6): " choice
 
     case $choice in
         1)
+            clear
+            echo ""
+            echo "Building Windows x64..."
+            if flutter build windows --release; then
+                # Read version from pubspec.yaml
+                VERSION=$(grep "^version:" pubspec.yaml | awk '{print $2}')
+                VERSION_CLEAN=$(echo $VERSION | cut -d'+' -f1)
+
+                # Create output directory
+                mkdir -p "build/dist"
+
+                # Create zip archive with version name
+                OUTPUT_FILE="build/dist/VaultSafe-${VERSION_CLEAN}-windows-x64.zip"
+                cd "build/windows/x64/runner/Release"
+                zip -r "../../../../../${OUTPUT_FILE}" .
+                cd - > /dev/null
+
+                echo ""
+                echo "[OK] Build completed!"
+                echo ""
+                echo "Output: ${OUTPUT_FILE}"
+            else
+                echo ""
+                echo "[ERROR] Build failed, please check error messages above"
+            fi
+            echo ""
+            read -p "Press Enter to continue..."
+            ;;
+
+        2)
             clear
             echo ""
             echo "Building arm64-v8a APK..."
@@ -51,7 +82,7 @@ while true; do
             read -p "Press Enter to continue..."
             ;;
 
-        2)
+        3)
             clear
             echo ""
             echo "Building armeabi-v7a APK (32-bit devices)..."
@@ -75,7 +106,7 @@ while true; do
             read -p "Press Enter to continue..."
             ;;
 
-        3)
+        4)
             clear
             echo ""
             echo "Building App Bundle (all architectures, optimized)..."
@@ -99,7 +130,7 @@ while true; do
             read -p "Press Enter to continue..."
             ;;
 
-        4)
+        5)
             clear
             echo ""
             echo "Cleaning build cache..."
@@ -114,7 +145,7 @@ while true; do
             read -p "Press Enter to continue..."
             ;;
 
-        5)
+        6)
             clear
             echo ""
             echo "Goodbye!"

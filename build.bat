@@ -10,23 +10,53 @@ echo ========================================
 echo.
 
 echo Please select build type:
-echo [1] APK - arm64-v8a (Recommended, ~20MB)
-echo [2] APK - armeabi-v7a (32-bit devices)
-echo [3] App Bundle (All architectures, optimized)
-echo [4] Clean build cache
-echo [5] Exit
+echo [1] Windows - x64 (Desktop)
+echo [2] APK - arm64-v8a (Recommended, ~20MB)
+echo [3] APK - armeabi-v7a (32-bit devices)
+echo [4] App Bundle (All architectures, optimized)
+echo [5] Clean build cache
+echo [6] Exit
 echo.
 
 set choice=
-set /p choice=Enter your choice (1-5):
+set /p choice=Enter your choice (1-6):
 
-if /i "%choice%"=="1" goto :apk_arm64
-if /i "%choice%"=="2" goto :apk_armeabi
-if /i "%choice%"=="3" goto :appbundle
-if /i "%choice%"=="4" goto :clean
-if /i "%choice%"=="5" goto :exit
+if /i "%choice%"=="1" goto :windows
+if /i "%choice%"=="2" goto :apk_arm64
+if /i "%choice%"=="3" goto :apk_armeabi
+if /i "%choice%"=="4" goto :appbundle
+if /i "%choice%"=="5" goto :clean
+if /i "%choice%"=="6" goto :exit
 
 REM Invalid choice, show menu again
+goto :main_menu
+
+:windows
+cls
+echo.
+echo Building Windows x64...
+call flutter build windows --release
+if errorlevel 1 goto :error
+
+REM Read version from pubspec.yaml
+for /f "tokens=2 delims=: " %%a in ('type pubspec.yaml ^| findstr "^version:"') do set VERSION_RAW=%%a
+set VERSION=%VERSION_RAW: =%
+set VERSION=%VERSION:"=%
+for /f "tokens=1 delims=+" %%a in ("%VERSION%") do set VERSION_CLEAN=%%a
+
+REM Create output directory
+if not exist "build\dist" mkdir "build\dist"
+
+REM Create zip archive with version name
+set OUTPUT_FILE=build\dist\VaultSafe-%VERSION_CLEAN%-windows-x64.zip
+powershell -Command "Compress-Archive -Path 'build\windows\x64\runner\Release\*' -DestinationPath '!OUTPUT_FILE!' -Force"
+
+echo.
+echo [OK] Build completed!
+echo.
+echo Output: !OUTPUT_FILE!
+echo.
+pause
 goto :main_menu
 
 :apk_arm64
@@ -56,7 +86,7 @@ goto :main_menu
 :apk_armeabi
 cls
 echo.
-echo Building armeabi-  APK (32-bit devices)...
+echo Building armeabi-v7a APK (32-bit devices)...
 call flutter build apk --release --target-platform android-armeabi-v7a
 if errorlevel 1 goto :error
 

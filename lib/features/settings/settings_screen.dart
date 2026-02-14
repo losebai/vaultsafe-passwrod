@@ -8,6 +8,7 @@ import 'package:vaultsafe/shared/providers/auth_provider.dart';
 import 'package:vaultsafe/shared/providers/password_provider.dart';
 import 'package:vaultsafe/shared/models/settings.dart';
 import 'package:vaultsafe/features/settings/logs_screen.dart';
+import 'package:vaultsafe/features/settings/change_password_screen.dart';
 import 'package:vaultsafe/features/update/update_screen.dart';
 import 'package:vaultsafe/shared/widgets/sync_settings_dialog.dart';
 import 'package:vaultsafe/shared/widgets/sync_buttons.dart';
@@ -493,9 +494,10 @@ class SettingsScreen extends ConsumerWidget {
 
   // 显示修改密码弹窗
   void _showChangePasswordDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const ChangePasswordDialog(),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const ChangePasswordScreen(),
+      ),
     );
   }
 
@@ -635,196 +637,6 @@ class SettingsScreen extends ConsumerWidget {
         );
       }
     }
-  }
-}
-
-/// 修改密码弹窗
-class ChangePasswordDialog extends ConsumerStatefulWidget {
-  const ChangePasswordDialog({super.key});
-
-  @override
-  ConsumerState<ChangePasswordDialog> createState() =>
-      _ChangePasswordDialogState();
-}
-
-class _ChangePasswordDialogState extends ConsumerState<ChangePasswordDialog> {
-  final _currentController = TextEditingController();
-  final _newController = TextEditingController();
-  final _confirmController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
-
-  bool _isLoading = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 500),
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // 标题
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer
-                          .withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      Icons.lock_reset,
-                      color: theme.colorScheme.primary,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    '修改主密码',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // 当前密码
-              TextFormField(
-                controller: _currentController,
-                decoration: const InputDecoration(
-                  labelText: '当前密码',
-                  prefixIcon: Icon(Icons.lock_outline),
-                ),
-                obscureText: true,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '请输入当前密码';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // 新密码
-              TextFormField(
-                controller: _newController,
-                decoration: const InputDecoration(
-                  labelText: '新密码',
-                  prefixIcon: Icon(Icons.lock),
-                ),
-                obscureText: true,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '请输入新密码';
-                  }
-                  if (value.length < 8) {
-                    return '密码至少需要 8 个字符';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // 确认新密码
-              TextFormField(
-                controller: _confirmController,
-                decoration: const InputDecoration(
-                  labelText: '确认新密码',
-                  prefixIcon: Icon(Icons.lock_clock),
-                ),
-                obscureText: true,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '请确认新密码';
-                  }
-                  if (value != _newController.text) {
-                    return '两次输入的密码不一致';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
-
-              // 按钮
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('取消'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: _isLoading ? null : _changePassword,
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('修改密码'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _changePassword() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isLoading = true);
-
-    final authService = ref.read(authServiceProvider);
-    final success = await authService.changeMasterPassword(
-      _currentController.text,
-      _newController.text,
-    );
-
-    if (!mounted) return;
-
-    setState(() => _isLoading = false);
-
-    if (success) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('密码已成功修改')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('当前密码不正确')),
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _currentController.dispose();
-    _newController.dispose();
-    _confirmController.dispose();
-    super.dispose();
   }
 }
 

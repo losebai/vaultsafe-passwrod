@@ -47,6 +47,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
     // 获取已注入的 AuthService 实例
     final authService = ref.read(authServiceProvider);
+    final settingsAsync = ref.read(settingsProvider);
+    final settings = settingsAsync.valueOrNull;
 
     final hasPassword = await authService.hasMasterPassword();
     if (!hasPassword) {
@@ -83,14 +85,26 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             );
           }
         } else {
-          // 没有存储的主密码，显示提示让用户输入
+          // 没有存储的主密码，需要用户输入一次密码来存储
+          // 显示提示让用户输入密码
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('指纹验证成功，请输入主密码解锁'),
-                duration: Duration(seconds: 2),
-              ),
-            );
+            // 如果开启了指纹完全解锁，提示用户首次需要输入密码
+            if (settings?.biometricFullUnlock == true) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('请输入主密码以启用指纹直接解锁'),
+                  duration: Duration(seconds: 3),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('指纹验证成功，请输入主密码解锁'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
           }
         }
       }
@@ -116,6 +130,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     if (success) {
       // 标记密码验证服务为已验证，解锁后在宽限期内不需要二次验证
       ref.read(passwordVerificationServiceProvider).markAsVerified();
+
+      // 如果开启了生物识别，存储加密的主密码用于后续指纹解锁
+      final settingsAsync = ref.read(settingsProvider);
+      final settings = settingsAsync.valueOrNull;
+      if (settings?.biometricEnabled == true) {
+        try {
+          await authService.storeEncryptedMasterPassword(_passwordController.text);
+        } catch (e) {
+          // 存储失败不影响解锁，只是下次指纹需要输密码
+        }
+      }
+
       _navigateToHome();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
