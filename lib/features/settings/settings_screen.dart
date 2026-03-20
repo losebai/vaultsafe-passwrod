@@ -14,6 +14,7 @@ import 'package:vaultsafe/shared/widgets/sync_settings_dialog.dart';
 import 'package:vaultsafe/shared/widgets/sync_buttons.dart';
 import 'package:vaultsafe/shared/widgets/master_password_dialog.dart';
 import 'package:vaultsafe/shared/helpers/backup_helper.dart';
+import 'package:vaultsafe/core/security/password_verification_service.dart';
 
 /// 设置界面
 class SettingsScreen extends ConsumerWidget {
@@ -494,11 +495,19 @@ class SettingsScreen extends ConsumerWidget {
 
   // 显示修改密码弹窗
   void _showChangePasswordDialog(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const ChangePasswordScreen(),
-      ),
-    );
+    // 桌面端使用弹窗，移动端使用整页导航
+    if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+      showDialog(
+        context: context,
+        builder: (context) => const _ChangePasswordDialog(),
+      );
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => const ChangePasswordScreen(),
+        ),
+      );
+    }
   }
 
   // 显示自动锁定时间选择弹窗
@@ -1390,4 +1399,153 @@ class _SettingsItem {
     this.onTap,
     this.trailing,
   });
+}
+
+/// 修改密码对话框（桌面端）
+class _ChangePasswordDialog extends ConsumerStatefulWidget {
+  const _ChangePasswordDialog();
+
+  @override
+  ConsumerState<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends ConsumerState<_ChangePasswordDialog> {
+  final _currentController = TextEditingController();
+  final _newController = TextEditingController();
+  final _confirmController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  bool _isLoading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('修改主密码'),
+      content: SizedBox(
+        width: 400,
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _currentController,
+                decoration: const InputDecoration(
+                  labelText: '当前密码',
+                  prefixIcon: Icon(Icons.lock_outline),
+                ),
+                obscureText: true,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return '请输入当前密码';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _newController,
+                decoration: const InputDecoration(
+                  labelText: '新密码',
+                  prefixIcon: Icon(Icons.lock),
+                ),
+                obscureText: true,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return '请输入新密码';
+                  }
+                  if (value.length < 8) {
+                    return '密码至少需要 8 个字符';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _confirmController,
+                decoration: const InputDecoration(
+                  labelText: '确认新密码',
+                  prefixIcon: Icon(Icons.lock_clock),
+                ),
+                obscureText: true,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return '请确认新密码';
+                  }
+                  if (value != _newController.text) {
+                    return '两次输入的密码不一致';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: _isLoading ? null : _changePassword,
+          child: _isLoading
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('修改'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _changePassword() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    // 修改主密码前强制验证主密码（不支持生物识别）
+    final verified = await requestMasterPasswordVerification(
+      context,
+      ref,
+      reason: '修改主密码',
+    );
+
+    if (!verified || !mounted) {
+      return; // 验证失败或取消
+    }
+
+    setState(() => _isLoading = true);
+
+    final authService = ref.read(authServiceProvider);
+    final success = await authService.changeMasterPassword(
+      _currentController.text,
+      _newController.text,
+    );
+
+    if (!mounted) return;
+
+    setState(() => _isLoading = false);
+
+    if (success) {
+      Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('密码已成功修改')),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前密码不正确')),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _currentController.dispose();
+    _newController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
 }

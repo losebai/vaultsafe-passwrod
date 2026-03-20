@@ -171,27 +171,28 @@ class _AddPasswordScreenState extends ConsumerState<AddPasswordScreen> {
               decoration: InputDecoration(
                 labelText: _isEditMode ? '新${_selectedType.passwordLabel}（留空保持不变）' : _selectedType.passwordLabel,
                 border: const OutlineInputBorder(),
-                suffixIcon: _selectedType.requiresLongTextInput
-                    ? null
-                    : SizedBox(
-                        width: 100,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.refresh),
-                              onPressed: _generatePassword,
-                              tooltip: '生成密码',
-                            ),
-                            IconButton(
-                              icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
-                              onPressed: () {
-                                setState(() => _obscurePassword = !_obscurePassword);
-                              },
-                            ),
-                          ],
+                suffixIcon: SizedBox(
+                  width: 100,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 只有非证书类型才显示生成密码按钮
+                      if (!_selectedType.isPasswordMultiline)
+                        IconButton(
+                          icon: const Icon(Icons.refresh),
+                          onPressed: _generatePassword,
+                          tooltip: '生成密码',
                         ),
+                      // 显示/隐藏密码按钮（对所有类型都显示）
+                      IconButton(
+                        icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                        onPressed: () {
+                          setState(() => _obscurePassword = !_obscurePassword);
+                        },
                       ),
+                    ],
+                  ),
+                ),
               ),
               maxLines: _selectedType.isPasswordMultiline ? 8 : 1,
               validator: (value) {

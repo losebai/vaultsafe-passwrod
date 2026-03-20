@@ -89,34 +89,29 @@ class AuthService {
   Future<void> setupMasterPasswordWithBiometric(String password, bool enableBiometric) async {
     await setupMasterPassword(password);
 
-    // 如果启用了生物识别，存储加密的主密码副本用于指纹解锁
+    // 如果启用了生物识别，存储主密码用于指纹解锁
     if (enableBiometric) {
-      await _storeEncryptedMasterPassword(password);
+      await _storeMasterPasswordForBiometric(password);
     }
   }
 
-  /// Store encrypted master password for biometric unlock
-  Future<void> _storeEncryptedMasterPassword(String password) async {
-    // 使用当前 masterKey 加密主密码
-    final encryptedPassword = EncryptionService.encrypt(password, _masterKey!);
-
+  /// 直接存储到 FlutterSecureStorage，依赖系统的安全机制
+  Future<void> _storeMasterPasswordForBiometric(String password) async {
     await _secureStorage.write(
-      key: 'encrypted_master_password',
-      value: jsonEncode(encryptedPassword.toJson()),
+      key: 'biometric_unlock_password',
+      value: password,
     );
   }
 
-  /// Get decrypted master password for biometric unlock
+  /// Store encrypted master password (for backwards compatibility)
+  Future<void> _storeEncryptedMasterPassword(String password) async {
+    await _storeMasterPasswordForBiometric(password);
+  }
+
+  /// 这个方法在生物识别验证成功后调用，可以读取存储的密码
   Future<String?> getDecryptedMasterPassword() async {
     try {
-      final encryptedJson = await _secureStorage.read(key: 'encrypted_master_password');
-      if (encryptedJson == null) return null;
-
-      final encryptedData = jsonDecode(encryptedJson) as Map<String, dynamic>;
-      final encrypted = EncryptedData.fromJson(encryptedData);
-
-      // 使用当前的 masterKey 解密主密码
-      return EncryptionService.decrypt(encrypted, _masterKey!);
+      return await _secureStorage.read(key: 'biometric_unlock_password');
     } catch (e) {
       return null;
     }
@@ -125,8 +120,8 @@ class AuthService {
   /// Update biometric setting and re-store encrypted password if needed
   Future<void> updateBiometricEnabled(bool enabled) async {
     if (!enabled) {
-      // 禁用时删除存储的加密主密码
-      await _secureStorage.delete(key: 'encrypted_master_password');
+      // 禁用时删除存储的主密码
+      await _secureStorage.delete(key: 'biometric_unlock_password');
     }
     // 启用时会在下次主密码解锁时自动存储
   }

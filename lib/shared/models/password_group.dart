@@ -1,8 +1,10 @@
-/// Password group model
+import 'package:vaultsafe/shared/models/password_entry_type.dart';
+
+/// 密码分组模型
 class PasswordGroup {
   final String id;
   final String name;
-  final String? parentId;
+  final String? parentId;  // 支持层级结构（暂时未使用）
   final int order;
   final String? icon;
   final String? color;
@@ -66,5 +68,55 @@ class PasswordGroup {
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
+  }
+
+  /// 获取默认分组的图标
+  static String getDefaultIcon(int order) {
+    const icons = [
+      'folder',
+      'work',
+      'star',
+      'card',
+      'favorite',
+      'cloud',
+      'shield',
+      'home',
+      'lock',
+    ];
+    return icons[order % icons.length];
+  }
+
+  /// 获取默认分组的颜色
+  static String getDefaultColor(int order) {
+    const colors = [
+      '#FF6B6F0', // 蓝色
+      '#4CAF50', // 橙色
+      '#FFB71C1', // 绿色
+      '#2196F3', // 黄色
+      '#9C27B0', // 棕色
+      '#E91E63', // 橙色
+      '#673AB7', // 紫色
+      '#607D8B0', // 蓝色
+    ];
+    return colors[order % colors.length];
+  }
+
+  /// 创建默认分组
+  static PasswordGroup createDefault(String id, String name, int order) {
+    final now = DateTime.now();
+    return PasswordGroup(
+      id: id,
+      name: name,
+      order: order,
+      icon: getDefaultIcon(order),
+      color: getDefaultColor(order),
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+
+  /// 生成唯一ID
+  static String generateId() {
+    return 'group_${DateTime.now().millisecondsSinceEpoch}_${DateTime.now().microsecond}';
   }
 }

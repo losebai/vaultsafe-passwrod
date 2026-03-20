@@ -85,23 +85,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             );
           }
         } else {
-          // 没有存储的主密码，需要用户输入一次密码来存储
-          // 显示提示让用户输入密码
-          if (mounted) {
-            // 如果开启了指纹完全解锁，提示用户首次需要输入密码
-            if (settings?.biometricFullUnlock == true) {
+          // 没有存储的主密码
+          if (settings?.biometricEnabled == true) {
+            // 开启了生物识别，但没有存储主密码
+            // 这种情况需要用户手动输入一次密码来存储
+            if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('请输入主密码以启用指纹直接解锁'),
+                  content: Text('请输入主密码以启用指纹解锁'),
                   duration: Duration(seconds: 3),
                   backgroundColor: Colors.orange,
-                ),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('指纹验证成功，请输入主密码解锁'),
-                  duration: Duration(seconds: 2),
                 ),
               );
             }
