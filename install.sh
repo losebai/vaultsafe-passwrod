@@ -38,7 +38,7 @@ echo "========================================"
 echo ""
 
 # Download
-echo "[1/4] Downloading $ZIP_FILE ..."
+echo "[1/3] Downloading $ZIP_FILE ..."
 echo "  URL: $DOWNLOAD_URL"
 TEMP_ZIP="/tmp/$ZIP_FILE"
 if command -v curl &> /dev/null; then
@@ -58,7 +58,7 @@ echo "  Download complete."
 
 # Extract
 echo ""
-echo "[2/4] Extracting to $INSTALL_DIR ..."
+echo "[2/3] Extracting to $INSTALL_DIR ..."
 rm -rf "$INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
 unzip -q -o "$TEMP_ZIP" -d "$INSTALL_DIR"
@@ -71,11 +71,9 @@ if [ -z "$BINARY" ]; then
     BINARY=$(find "$INSTALL_DIR" -type f -perm -u+x | head -1)
 fi
 
-# Create shortcut / symlink
+# Create shortcut
 echo ""
-echo "[3/4] Creating symlink ..."
-BIN_DIR="$HOME/.local/bin"
-mkdir -p "$BIN_DIR"
+echo "[3/3] Creating shortcut ..."
 
 if [[ "$OSTYPE" == "darwin"* ]]; then
     # macOS: copy to /Applications
@@ -88,26 +86,9 @@ fi
 
 if [ -n "$BINARY" ]; then
     chmod +x "$BINARY"
-    ln -sf "$BINARY" "$BIN_DIR/$APP_NAME" 2>/dev/null
-    echo "  Symlink created: $BIN_DIR/$APP_NAME"
+    echo "  Binary ready: $BINARY"
 else
     echo "  Warning: No binary found."
-fi
-
-# Add to PATH
-echo ""
-echo "[4/4] Configuring PATH ..."
-SHELL_RC="$HOME/.bashrc"
-if [[ -f "$HOME/.zshrc" ]]; then
-    SHELL_RC="$HOME/.zshrc"
-fi
-
-if ! echo "$PATH" | grep -q "$BIN_DIR"; then
-    echo "" >> "$SHELL_RC"
-    echo "export PATH=\"\$PATH:$BIN_DIR\"" >> "$SHELL_RC"
-    echo "  Added $BIN_DIR to PATH in $SHELL_RC"
-else
-    echo "  Already in PATH."
 fi
 
 echo ""

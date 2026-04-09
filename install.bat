@@ -17,7 +17,7 @@ echo ========================================
 echo.
 
 REM Download
-echo [1/4] Downloading %ZIP_FILE% ...
+echo [1/3] Downloading %ZIP_FILE% ...
 echo   URL: %DOWNLOAD_URL%
 set TEMP_ZIP=%TEMP%\%ZIP_FILE%
 powershell -Command "Invoke-WebRequest -Uri '%DOWNLOAD_URL%' -OutFile '%TEMP_ZIP%' -UseBasicParsing"
@@ -30,27 +30,21 @@ echo   Download complete.
 echo.
 
 REM Extract
-echo [2/4] Extracting to %INSTALL_DIR% ...
+echo [2/3] Extracting to %INSTALL_DIR% ...
 if exist "%INSTALL_DIR%" rmdir /s /q "%INSTALL_DIR%"
 powershell -Command "Expand-Archive -Path '%TEMP_ZIP%' -DestinationPath '%INSTALL_DIR%' -Force"
 del /f /q "%TEMP_ZIP%"
 echo   Extracted.
 echo.
 
-REM Create shortcut
-echo [3/4] Creating shortcut ...
-powershell -Command "$ws = New-Object -ComObject WScript.Shell; $exe = Get-ChildItem '%INSTALL_DIR%' -Filter '*.exe' -Recurse | Select -First 1; if ($exe) { $s = $ws.CreateShortcut([Environment]::GetFolderPath('Desktop') + '\%APP_NAME%.lnk'); $s.TargetPath = $exe.FullName; $s.WorkingDirectory = $exe.DirectoryName; $s.Save(); $s = $ws.CreateShortcut([Environment]::GetFolderPath('StartMenu') + '\%APP_NAME%.lnk'); $s.TargetPath = $exe.FullName; $s.WorkingDirectory = $exe.DirectoryName; $s.Save() }"
-echo   Shortcuts created.
-echo.
-
-REM Add to PATH
-echo [4/4] Adding to PATH ...
-powershell -Command "$exe = Get-ChildItem '%INSTALL_DIR%' -Filter '*.exe' -Recurse | Select -First 1; if ($exe) { $p = [Environment]::GetEnvironmentVariable('Path','User'); if ($p -notlike '*' + $exe.DirectoryName + '*') { [Environment]::SetEnvironmentVariable('Path', $p + ';' + $exe.DirectoryName, 'User') } }"
-echo   Done.
+REM Create shortcuts
+echo [3/3] Creating shortcuts ...
+powershell -Command "$ws = New-Object -ComObject WScript.Shell; $exe = Get-ChildItem '%INSTALL_DIR%' -Filter '*.exe' -Recurse | Select -First 1; if ($exe) { $s = $ws.CreateShortcut([Environment]::GetFolderPath('Desktop') + '\%APP_NAME%.lnk'); $s.TargetPath = $exe.FullName; $s.WorkingDirectory = $exe.DirectoryName; $s.Save(); $s = $ws.CreateShortcut([Environment]::GetFolderPath('StartMenu') + '\%APP_NAME%.lnk'); $s.TargetPath = $exe.FullName; $s.WorkingDirectory = $exe.DirectoryName; $s.Save(); Write-Host '  Desktop shortcut created.'; Write-Host '  Start Menu shortcut created.' } else { Write-Host '  Warning: No .exe found.' }"
 echo.
 
 echo ========================================
 echo   %APP_NAME% v%VERSION% installed!
 echo   Location: %INSTALL_DIR%
+echo   Double-click desktop shortcut to start.
 echo ========================================
 pause
