@@ -1,15 +1,35 @@
 # 🔒 VaultSafe — End-to-End Encrypted Password Manager
 
+# One-Click Install (Pre-built Release)
+
+No need to build from source. Download and install the latest release directly:
+
+**Windows (PowerShell):**
+```powershell
+irm https://gitee.com/baichen9187/vaultsafe-passwrod/raw/master/install.ps1 | iex
+```
+
+**Windows (CMD):**
+```batch
+curl -fsSL -o "%TEMP%\install.bat" https://gitee.com/baichen9187/vaultsafe-passwrod/raw/master/install.bat && "%TEMP%\install.bat"
+```
+
+**macOS / Linux:**
+```bash
+curl -fsSL https://gitee.com/baichen9187/vaultsafe-passwrod/raw/master/install.sh | bash
+```
+
+
 > **Secure · Private · Cross-Platform · End-to-End Encryption**
 
-[![Version](https://img.shields.io/badge/version-1.0.1-blue)](https://github.com/yourusername/vaultsafe/releases)
+[![Version](https://img.shields.io/badge/version-1.0.4-blue)](https://github.com/yourusername/vaultsafe/releases)
 [![Flutter](https://img.shields.io/badge/Flutter-3.24+-brightgreen)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.5+-blue)](https://dart.dev)
 [![License](https://img.shields.io/badge/license-MIT-purple)](LICENSE)
 
 **VaultSafe** is an open-source, secure, cross-platform password manager built with Flutter. All sensitive data is encrypted locally on your device using your master key - **servers cannot decrypt any data**. Supports complete offline usage with optional encrypted cloud sync.
 
-**Current Version**: 1.0.1 | [更新日志](CHANGELOG.md)
+**Current Version**: 1.0.4 | [更新日志](CHANGELOG.md)
 
 ## 📱 应用截图
 
@@ -46,14 +66,25 @@
   - **Password verification required** for viewing, copying, and editing (v1.0.1)
   - **Configurable verification timeout** (10s/30s/1m/5m/15m) (v1.0.1)
   - Password generator utility (available for UI integration)
-- 🗂️ **Group Management**: Organize passwords into folders
+- 🔑 **TOTP Two-Factor Authentication** (v1.0.4):
+  - Add authenticators via QR code image upload, clipboard paste, manual input, or otpauth:// URI
+  - Real-time code generation with countdown timer (RFC 6238)
+  - Support for SHA-1/SHA-256/SHA-512 algorithms
+  - Desktop: list + detail panel layout, dialog for adding
+  - Mobile: card list with one-tap copy
+- 🗂️ **Group Management** (v1.0.4): Organize passwords into folders (max 5 groups), compact + button
+- 🛡️ **Biometric Authentication** (v1.0.3):
+  - Fingerprint unlock on app entry (no master password needed)
+  - Optional full biometric unlock for all sensitive operations
+  - Changing master password always requires password input
 - ⚙️ **Settings Center**:
   - Change master password (with password strength validation)
+  - Desktop: dialog popup; Mobile: page navigation (v1.0.3)
   - Enable/disable sync
   - Import/export encrypted backups (JSON format)
   - Auto-lock timeout configuration
   - Custom data directory selection
-  - Biometric authentication toggle (UI ready, integration in progress)
+  - Biometric authentication toggle
   - **Password verification timeout configuration** (v1.0.1)
 - 🔄 **Third-Party Sync** (Foundation):
   - Configure custom sync endpoints
@@ -84,8 +115,10 @@
 - **Encryption**: `pointycastle` (v3.9.1) + `crypto` (v3.0.3) (PBKDF2 + AES-256-GCM)
 - **Concurrency**: Dart Isolates (for async key derivation in v1.0.1)
 - **Network**: `dio` (v5.7.0) + custom sync protocol
-- **File Picker**: `file_picker` (v8.1.2) for backup import/export
+- **File Picker**: `file_picker` (v8.1.2) for backup import/export and QR code image selection
 - **Biometrics**: `local_auth` (v2.3.0) (Face ID / Touch ID / Windows Hello)
+- **QR Code**: `qr_code_dart_decoder` (v0.0.5) for decoding QR codes from images
+- **Clipboard**: `pasteboard` (v0.3.0) for reading clipboard images on desktop
 - **UI**: Material 3 Design System
 
 ---
@@ -104,6 +137,7 @@ lib/
 ├── features/
 │   ├── auth/             # Master password setup, authentication, unlock flow
 │   ├── passwords/        # Password management UI & logic
+│   ├── totp/             # TOTP two-factor authentication (v1.0.4)
 │   ├── profile/          # Profile screen
 │   ├── settings/         # Settings center (password, sync, backup)
 │   └── home/             # Home screen with navigation
@@ -124,7 +158,10 @@ lib/
 - Flutter SDK 3.24 or higher
 - Dart 3.5 or higher
 
-### Install Dependencies
+
+### Build from Source
+
+#### Install Dependencies
 
 ```bash
 flutter pub get
@@ -304,15 +341,15 @@ Response:
 
 ## 🏗️ Development Status
 
-**Current Version**: **1.0.1** (2025-02-05)
+**Current Version**: **1.0.4** (2025-04-09)
 
-### ✅ Implemented Features (v1.0.1)
+### ✅ Implemented Features (v1.0.4)
 - [x] Master password setup and authentication
 - [x] **Async key derivation** (UI never freezes)
 - [x] **Password verification for sensitive operations** (view, copy, edit)
 - [x] **Configurable verification timeout**
 - [x] Password CRUD operations
-- [x] Group/folder management
+- [x] Group/folder management (max 5 groups, compact UI)
 - [x] Encrypted local storage (Hive)
 - [x] Import/export encrypted backups
 - [x] Change master password
@@ -324,16 +361,20 @@ Response:
 - [x] **Unified data directory structure**
 - [x] **Automatic config migration**
 - [x] **Improved error handling** for update service
-- [x] **Friendly error messages** for network issues
+- [x] **Biometric authentication** (fingerprint unlock, full biometric unlock) (v1.0.3)
+- [x] **Desktop dialog for password change** (v1.0.3)
+- [x] **TOTP two-factor authentication** with QR code scanning (v1.0.4)
+- [x] **QR code image upload and clipboard paste** for TOTP setup (v1.0.4)
+- [x] **Unified desktop page title styles** (v1.0.4)
+- [x] **Desktop list + detail panel layout** for TOTP (v1.0.4)
 
 ### 🚧 In Progress
-- [ ] Biometric authentication integration
 - [ ] Auto-sync timer implementation
 - [ ] Password strength indicator
 - [ ] Password generator UI integration
 
-### ✅ Implemented Features
-- [x] Device list management
+### 📋 Planned Features
+- [ ] Device list management
 - [ ] Security event logging
 - [ ] Theme switching (dark/light)
 - [ ] Drag-and-drop group reordering
@@ -419,6 +460,20 @@ Contributions are welcome! Please ensure:
 ---
 
 ## 📋 Changelog
+
+### **[1.0.4]** (2025-04-09)
+- ✨ TOTP two-factor authentication (RFC 6238)
+- ✨ QR code image upload and clipboard paste for TOTP setup
+- ✨ Unified desktop page title styles
+- ✨ Desktop list + detail panel layout for TOTP
+- ✨ Group management: max 5 groups, compact + button
+- 🐛 Fixed biometric unlock requiring password after restart
+- 🐛 Fixed desktop change password using page instead of dialog
+
+### **[1.0.3]** (2025-03-xx)
+- ✨ Biometric authentication (fingerprint unlock)
+- ✨ Full biometric unlock option for all operations
+- ✨ Desktop dialog for changing master password
 
 ### **[1.0.1]** (2025-02-05)
 - ✨ Password verification for sensitive operations (view, copy, edit)
