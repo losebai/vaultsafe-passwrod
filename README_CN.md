@@ -6,17 +6,17 @@
 
 **Windows（PowerShell）：**
 ```powershell
-irm https://public.loserbai.cn/vaultsafe-passwrod/raw/master/install.ps1 | iex
+irm https://public.loserbai.cn/vaultsafe-passwrod/install.ps1 | iex
 ```
 
 **Windows（CMD）：**
 ```batch
-curl -fsSL -o "%TEMP%\install.bat" https://public.loserbai.cn/vaultsafe-passwrod/raw/master/install.bat && "%TEMP%\install.bat"
+curl -fsSL -o "%TEMP%\install.bat" https://public.loserbai.cn/vaultsafe-passwrod/install.bat && "%TEMP%\install.bat"
 ```
 
 **macOS / Linux：**
 ```bash
-curl -fsSL https://public.loserbai.cn/vaultsafe-passwrod/raw/master/install.sh | bash
+curl -fsSL https://public.loserbai.cn/vaultsafe-passwrod/install.sh | bash
 ```
 
 
