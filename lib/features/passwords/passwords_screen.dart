@@ -230,8 +230,7 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
   // 桌面端顶部工具栏
   Widget _buildDesktopToolbar(ThemeData theme) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 23, vertical: 16),
-      height: 64,
+      padding: const EdgeInsets.fromLTRB(32, 32, 32, 16),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
@@ -244,8 +243,9 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
         children: [
           Text(
             '密码',
-            style: theme.textTheme.headlineSmall?.copyWith(
+            style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
+              color: const Color.fromARGB(255, 0, 72, 120),
             ),
           ),
           const Spacer(),
@@ -786,66 +786,76 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          // 分组筛选列表
-          Expanded(
-            child: groupsAsync.when(
-              data: (groups) {
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      // "全部"选项
-                      FilterChip(
-                        label: const Text('全部'),
-                        selected: _selectedGroupId == null,
-                        onSelected: (selected) {
-                          setState(() => _selectedGroupId = selected ? null : _selectedGroupId);
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      // 动态生成分组选项
-                      ...groups.map((group) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: FilterChip(
-                            label: Text(group.name),
-                            selected: _selectedGroupId == group.id,
-                            onSelected: (selected) {
-                              setState(() {
-                                _selectedGroupId = selected ? group.id : null;
-                              });
-                            },
-                            // 所有分组都可以删除
-                            onDeleted: () {
-                              _deleteGroup(group.id);
-                            },
+      width: double.infinity,
+      alignment: Alignment.centerLeft,
+      child: groupsAsync.when(
+        data: (groups) {
+          const maxGroups = 5;
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: _isDesktop ? 32 : 16, vertical: 8),
+            child: Row(
+              children: [
+                // "全部"选项
+                FilterChip(
+                  label: const Text('全部'),
+                  selected: _selectedGroupId == null,
+                  onSelected: (selected) {
+                    setState(() => _selectedGroupId = selected ? null : _selectedGroupId);
+                  },
+                ),
+                const SizedBox(width: 8),
+                // 动态生成分组选项
+                ...groups.map((group) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Text(group.name),
+                      selected: _selectedGroupId == group.id,
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedGroupId = selected ? group.id : null;
+                        });
+                      },
+                      onDeleted: () {
+                        _deleteGroup(group.id);
+                      },
+                    ),
+                  );
+                }),
+                // 新增分组按钮（+ 图标），最多5个分组
+                if (groups.length < maxGroups)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: InkWell(
+                      onTap: _showAddGroupDialog,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
                           ),
-                        );
-                      }),
-                    ],
+                        ),
+                        child: Icon(
+                          Icons.add,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
                   ),
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const SizedBox.shrink(),
+              ],
             ),
           ),
-          // 新增分组按钮
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: OutlinedButton.icon(
-              onPressed: _showAddGroupDialog,
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('新增分组'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-            ),
-          ),
-        ],
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => const SizedBox.shrink(),
       ),
     );
   }
@@ -904,6 +914,16 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
     // 检查是否已存在同名分组
     final groupsAsync = ref.read(passwordGroupsProvider);
     groupsAsync.whenData((groups) async {
+      // 检查分组数量限制（最多5个）
+      if (groups.length >= 5) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('最多只能创建5个分组')),
+          );
+        }
+        return;
+      }
+
       // 检查是否已存在同名分组
       if (groups.any((g) => g.name == groupName)) {
         if (mounted) {

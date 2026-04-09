@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultsafe/features/passwords/passwords_screen.dart';
 import 'package:vaultsafe/features/settings/settings_screen.dart';
 import 'package:vaultsafe/features/home/sync_screen.dart';
+import 'package:vaultsafe/features/totp/totp_screen.dart';
 import 'package:vaultsafe/shared/providers/log_provider.dart';
 import 'package:vaultsafe/shared/models/log_entry.dart';
 import 'package:vaultsafe/components/NavigationMenu.dart';
@@ -29,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   late final List<Widget> _screens = [
     const PasswordsScreen(),
+    const TotpScreen(),
     const SettingsScreen(),
   ];
 
@@ -37,6 +39,11 @@ class _HomeScreenState extends State<HomeScreen> {
       icon: Icons.password_rounded,
       selectedIcon: Icons.password_rounded,
       label: '密码',
+    ),
+    _NavigationItem(
+      icon: Icons.phonelink_lock_rounded,
+      selectedIcon: Icons.phonelink_lock_rounded,
+      label: '验证器',
     ),
     _NavigationItem(
       icon: Icons.history_rounded,
@@ -55,16 +62,22 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   ];
 
-  final List<_NavigationItem> _appNavItems = const [ _NavigationItem(
-    icon: Icons.password_rounded,
-    selectedIcon: Icons.password_rounded,
-    label: '密码',
-  ),
+  final List<_NavigationItem> _appNavItems = const [
+    _NavigationItem(
+      icon: Icons.password_rounded,
+      selectedIcon: Icons.password_rounded,
+      label: '密码',
+    ),
+    _NavigationItem(
+      icon: Icons.phonelink_lock_rounded,
+      selectedIcon: Icons.phonelink_lock_rounded,
+      label: '验证器',
+    ),
     _NavigationItem(
       icon: Icons.settings_rounded,
       selectedIcon: Icons.settings_rounded,
       label: '设置',
-    )
+    ),
   ];
 
   // 检测是否为桌面平台
@@ -117,21 +130,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildDesktopContent(BuildContext context, ThemeData theme) {
     switch (_selectedIndex) {
       case 0: // 密码
-        return _buildPasswordsContent();
-      case 1: // 操作日志
+        return const PasswordsScreen();
+      case 1: // 验证器
+        return const TotpScreen();
+      case 2: // 操作日志
         return _buildLogsContent(context);
-      case 2: // 同步
+      case 3: // 同步
         return _buildSyncContent(context);
-      case 3: // 设置
+      case 4: // 设置
         return _buildSettingsContent(context);
       default:
-        return _screens[_selectedIndex];
+        return const PasswordsScreen();
     }
-  }
-
-  // 构建密码页面内容
-  Widget _buildPasswordsContent() {
-    return const PasswordsScreen();
   }
 
   // 构建操作日志内容

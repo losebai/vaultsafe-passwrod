@@ -7,17 +7,20 @@ import 'package:vaultsafe/core/encryption/encryption_service.dart';
 import 'package:vaultsafe/core/logging/log_service.dart';
 import 'package:vaultsafe/shared/models/password_entry.dart';
 import 'package:vaultsafe/shared/models/password_group.dart';
+import 'package:vaultsafe/shared/models/totp_entry.dart';
 
 /// 使用 Hive 进行本地加密数据持久化的存储服务
 class StorageService {
   static const String _passwordsBoxName = 'passwords';
   static const String _groupsBoxName = 'groups';
   static const String _settingsBoxName = 'settings';
+  static const String _totpBoxName = 'totp';
   static const String _defaultDataDir = 'vault_safe_data';
 
   Box<dynamic>? _passwordsBox;
   Box<dynamic>? _groupsBox;
   Box<dynamic>? _settingsBox;
+  Box<dynamic>? _totpBox;
 
   bool _initialized = false;
   String? _currentDirectory;
@@ -84,6 +87,7 @@ class StorageService {
       _passwordsBox = await Hive.openBox(_passwordsBoxName);
       _groupsBox = await Hive.openBox(_groupsBoxName);
       _settingsBox = await Hive.openBox(_settingsBoxName);
+      _totpBox = await Hive.openBox(_totpBoxName);
 
       _initialized = true;
       log.i('StorageService: 初始化完成! 数据路径: $dataPath', source: 'StorageService');
@@ -96,7 +100,7 @@ class StorageService {
 
   /// 确保已初始化
   void _ensureInitialized() {
-    if (!_initialized || _passwordsBox == null || _groupsBox == null || _settingsBox == null) {
+    if (!_initialized || _passwordsBox == null || _groupsBox == null || _settingsBox == null || _totpBox == null) {
       throw Exception('StorageService not initialized. Call init() first.');
     }
   }
@@ -275,6 +279,60 @@ class StorageService {
     _ensureInitialized();
 
     await _settingsBox!.clear();
+  }
+
+  // ===== TOTP =====
+
+  /// 获取所有 TOTP 条目
+  Future<List<TotpEntry>> getTotpEntries() async {
+    _ensureInitialized();
+
+    final entries = <TotpEntry>[];
+    for (final key in _totpBox!.keys) {
+      final json = _totpBox!.get(key) as Map<dynamic, dynamic>?;
+      if (json != null) {
+        try {
+          final entry = TotpEntry.fromJson(Map<String, dynamic>.from(json));
+          entries.add(entry);
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+    return entries;
+  }
+
+  /// 获取单个 TOTP 条目
+  Future<TotpEntry?> getTotpEntry(String id) async {
+    _ensureInitialized();
+
+    final json = _totpBox!.get(id) as Map<dynamic, dynamic>?;
+    if (json != null) {
+      try {
+        return TotpEntry.fromJson(Map<String, dynamic>.from(json));
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /// 保存 TOTP 条目
+  Future<void> saveTotpEntry(TotpEntry entry) async {
+    _ensureInitialized();
+    await _totpBox!.put(entry.id, entry.toJson());
+  }
+
+  /// 删除 TOTP 条目
+  Future<void> deleteTotpEntry(String id) async {
+    _ensureInitialized();
+    await _totpBox!.delete(id);
+  }
+
+  /// 清除所有 TOTP 数据
+  Future<void> clearTotpEntries() async {
+    _ensureInitialized();
+    await _totpBox!.clear();
   }
 
   // ===== 备份/导出 =====

@@ -4,7 +4,7 @@
 # 应用信息
 app:
   name: "VaultSafe"
-  version: "1.0.1"
+  version: "1.0.4"
   description: "安全的跨平台密码管理器"
 
 # API 配置

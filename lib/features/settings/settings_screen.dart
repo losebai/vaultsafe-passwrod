@@ -31,8 +31,8 @@ class SettingsScreen extends ConsumerWidget {
               title: Text(
                 '设置',
                 style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                    fontWeight: FontWeight.bold,
+                    color: const Color.fromARGB(255, 0, 72, 120)),
               ),
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(0.5),
@@ -57,8 +57,8 @@ class SettingsScreen extends ConsumerWidget {
                   Text(
                     '设置',
                     style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                        fontWeight: FontWeight.bold,
+                        color: const Color.fromARGB(255, 0, 72, 120)),
                   ),
                   const SizedBox(height: 32),
                 ],
@@ -77,7 +77,8 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingsItem(
                       icon: Icons.timer_outlined,
                       title: '自动锁定',
-                      description: '${_formatTimeout(settings.autoLockTimeout)} - 不操作时自动锁定',
+                      description:
+                          '${_formatTimeout(settings.autoLockTimeout)} - 不操作时自动锁定',
                       onTap: () => _showTimeoutDialog(
                           context, ref, settings.autoLockTimeout),
                     ),
@@ -1406,7 +1407,8 @@ class _ChangePasswordDialog extends ConsumerStatefulWidget {
   const _ChangePasswordDialog();
 
   @override
-  ConsumerState<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+  ConsumerState<_ChangePasswordDialog> createState() =>
+      _ChangePasswordDialogState();
 }
 
 class _ChangePasswordDialogState extends ConsumerState<_ChangePasswordDialog> {
