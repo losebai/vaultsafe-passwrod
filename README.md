@@ -51,6 +51,10 @@ curl -fsSL https://public.loserbai.cn/vaultsafe-passwrod/install.sh | bash
     <td><img src="docs/pc/同步.png" alt="同步" width="300"/></td>
     <td><img src="docs/pc/主页.png" alt="主页" width="300"/></td>
   </tr>
+  <tr>
+    <td><img src="docs/pc/totp1.png" alt="totp1" width="300"/> </td>
+    <td><img src="docs/pc/totp.png" alt="totp" width="300"/> </td>
+  </tr>
 </table>
 
 ---
