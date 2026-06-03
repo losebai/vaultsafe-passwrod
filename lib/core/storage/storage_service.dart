@@ -343,12 +343,14 @@ class StorageService {
 
     final entries = await getPasswordEntries();
     final groups = await getGroups();
+    final totpEntries = await getTotpEntries();
 
     return {
       'version': '1.0',
       'exportedAt': DateTime.now().toIso8601String(),
       'passwords': entries.map((e) => e.toJson()).toList(),
       'groups': groups.map((g) => g.toJson()).toList(),
+      'totpEntries': totpEntries.map((e) => e.toJson()).toList(),
     };
   }
 
@@ -386,6 +388,22 @@ class StorageService {
             Map<String, dynamic>.from(json as Map),
           );
           await saveGroup(group);
+        } catch (e) {
+          // 跳过无效条目
+          continue;
+        }
+      }
+    }
+
+    // 导入 TOTP 条目
+    final totpJson = data['totpEntries'] as List<dynamic>?;
+    if (totpJson != null) {
+      for (final json in totpJson) {
+        try {
+          final entry = TotpEntry.fromJson(
+            Map<String, dynamic>.from(json as Map),
+          );
+          await saveTotpEntry(entry);
         } catch (e) {
           // 跳过无效条目
           continue;
@@ -473,6 +491,22 @@ class StorageService {
         }
       }
     }
+
+    // 导入 TOTP 条目（TOTP 密钥不使用主密码加密，直接复制）
+    final totpJson = data['totpEntries'] as List<dynamic>?;
+    if (totpJson != null) {
+      for (final json in totpJson) {
+        try {
+          final entry = TotpEntry.fromJson(
+            Map<String, dynamic>.from(json as Map),
+          );
+          await saveTotpEntry(entry);
+        } catch (e) {
+          log.e('导入 TOTP 条目失败: ${json['id']}', source: 'StorageService', error: e);
+          continue;
+        }
+      }
+    }
   }
 
   // ===== 清理 =====
@@ -498,6 +532,7 @@ class StorageService {
     await clearPasswordEntries();
     await clearGroups();
     await clearSettings();
+    await clearTotpEntries();
   }
 
   /// 更改数据目录并迁移数据

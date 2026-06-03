@@ -22,14 +22,14 @@ curl -fsSL https://public.loserbai.cn/vaultsafe-passwrod/install.sh | bash
 
 > **Secure · Private · Cross-Platform · End-to-End Encryption**
 
-[![Version](https://img.shields.io/badge/version-1.0.4-blue)](https://github.com/yourusername/vaultsafe/releases)
+[![Version](https://img.shields.io/badge/version-1.0.5-blue)](https://github.com/yourusername/vaultsafe/releases)
 [![Flutter](https://img.shields.io/badge/Flutter-3.24+-brightgreen)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.5+-blue)](https://dart.dev)
 [![License](https://img.shields.io/badge/license-MIT-purple)](LICENSE)
 
 **VaultSafe** is an open-source, secure, cross-platform password manager built with Flutter. All sensitive data is encrypted locally on your device using your master key - **servers cannot decrypt any data**. Supports complete offline usage with optional encrypted cloud sync.
 
-**Current Version**: 1.0.4 | [更新日志](CHANGELOG.md)
+**Current Version**: 1.0.5 | [更新日志](CHANGELOG.md)
 
 ## 📱 应用截图
 
@@ -70,13 +70,13 @@ curl -fsSL https://public.loserbai.cn/vaultsafe-passwrod/install.sh | bash
   - **Password verification required** for viewing, copying, and editing (v1.0.1)
   - **Configurable verification timeout** (10s/30s/1m/5m/15m) (v1.0.1)
   - Password generator utility (available for UI integration)
-- 🔑 **TOTP Two-Factor Authentication** (v1.0.4):
+- 🔑 **TOTP Two-Factor Authentication** (v1.0.5):
   - Add authenticators via QR code image upload, clipboard paste, manual input, or otpauth:// URI
   - Real-time code generation with countdown timer (RFC 6238)
   - Support for SHA-1/SHA-256/SHA-512 algorithms
   - Desktop: list + detail panel layout, dialog for adding
   - Mobile: card list with one-tap copy
-- 🗂️ **Group Management** (v1.0.4): Organize passwords into folders (max 5 groups), compact + button
+- 🗂️ **Group Management** (v1.0.5): Organize passwords into folders (max 5 groups), compact + button
 - 🛡️ **Biometric Authentication** (v1.0.3):
   - Fingerprint unlock on app entry (no master password needed)
   - Optional full biometric unlock for all sensitive operations
@@ -141,7 +141,7 @@ lib/
 ├── features/
 │   ├── auth/             # Master password setup, authentication, unlock flow
 │   ├── passwords/        # Password management UI & logic
-│   ├── totp/             # TOTP two-factor authentication (v1.0.4)
+│   ├── totp/             # TOTP two-factor authentication (v1.0.5)
 │   ├── profile/          # Profile screen
 │   ├── settings/         # Settings center (password, sync, backup)
 │   └── home/             # Home screen with navigation
@@ -345,9 +345,9 @@ Response:
 
 ## 🏗️ Development Status
 
-**Current Version**: **1.0.4** (2025-04-09)
+**Current Version**: **1.0.5** (2025-04-09)
 
-### ✅ Implemented Features (v1.0.4)
+### ✅ Implemented Features (v1.0.5)
 - [x] Master password setup and authentication
 - [x] **Async key derivation** (UI never freezes)
 - [x] **Password verification for sensitive operations** (view, copy, edit)
@@ -367,10 +367,10 @@ Response:
 - [x] **Improved error handling** for update service
 - [x] **Biometric authentication** (fingerprint unlock, full biometric unlock) (v1.0.3)
 - [x] **Desktop dialog for password change** (v1.0.3)
-- [x] **TOTP two-factor authentication** with QR code scanning (v1.0.4)
-- [x] **QR code image upload and clipboard paste** for TOTP setup (v1.0.4)
-- [x] **Unified desktop page title styles** (v1.0.4)
-- [x] **Desktop list + detail panel layout** for TOTP (v1.0.4)
+- [x] **TOTP two-factor authentication** with QR code scanning (v1.0.5)
+- [x] **QR code image upload and clipboard paste** for TOTP setup (v1.0.5)
+- [x] **Unified desktop page title styles** (v1.0.5)
+- [x] **Desktop list + detail panel layout** for TOTP (v1.0.5)
 
 ### 🚧 In Progress
 - [ ] Auto-sync timer implementation
@@ -465,7 +465,7 @@ Contributions are welcome! Please ensure:
 
 ## 📋 Changelog
 
-### **[1.0.4]** (2025-04-09)
+### **[1.0.5]** (2025-04-09)
 - ✨ TOTP two-factor authentication (RFC 6238)
 - ✨ QR code image upload and clipboard paste for TOTP setup
 - ✨ Unified desktop page title styles

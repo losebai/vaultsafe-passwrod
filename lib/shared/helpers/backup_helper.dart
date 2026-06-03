@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:vaultsafe/core/backup/backup_service.dart';
 import 'package:vaultsafe/shared/providers/auth_provider.dart';
 import 'package:vaultsafe/shared/providers/password_provider.dart';
+import 'package:vaultsafe/shared/providers/totp_provider.dart';
 
 /// 备份功能助手 - 可在多个地方复用
 class BackupHelper {
@@ -169,9 +170,10 @@ class BackupHelper {
       Navigator.of(context).pop(); // 关闭加载对话框
 
       if (importResult.success) {
-        // 刷新密码列表
+        // 刷新密码列表和 TOTP 列表
         await ref.read(passwordEntriesProvider.notifier).loadEntries();
         await ref.read(passwordGroupsProvider.notifier).loadGroups();
+        await ref.read(totpEntriesProvider.notifier).loadEntries();
 
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(

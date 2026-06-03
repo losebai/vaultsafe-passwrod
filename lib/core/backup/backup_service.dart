@@ -110,6 +110,7 @@ class BackupService {
         success: true,
         passwordCount: (data['passwords'] as List?)?.length ?? 0,
         groupCount: (data['groups'] as List?)?.length ?? 0,
+        totpCount: (data['totpEntries'] as List?)?.length ?? 0,
       );
     } catch (e) {
       return ImportResult(
@@ -220,18 +221,24 @@ class ImportResult {
   final String? error;
   final int? passwordCount;
   final int? groupCount;
+  final int? totpCount;
 
   ImportResult({
     required this.success,
     this.error,
     this.passwordCount,
     this.groupCount,
+    this.totpCount,
   });
 
   @override
   String toString() {
     if (success) {
-      return '导入成功: $passwordCount 个密码, $groupCount 个分组';
+      final parts = <String>[];
+      if (passwordCount != null) parts.add('$passwordCount 个密码');
+      if (groupCount != null) parts.add('$groupCount 个分组');
+      if (totpCount != null && totpCount! > 0) parts.add('$totpCount 个TOTP');
+      return '导入成功: ${parts.join(', ')}';
     }
     return '导入失败: $error';
   }

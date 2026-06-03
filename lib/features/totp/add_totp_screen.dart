@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:qr_code_dart_decoder/qr_code_dart_decoder.dart';
+import 'package:qr_code_dart_decoder/qr_code_dart_decoder.dart' as qr_decoder;
 import 'package:pasteboard/pasteboard.dart';
 import 'package:vaultsafe/shared/providers/totp_provider.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 /// 添加 TOTP 验证器页面
 class AddTotpScreen extends ConsumerStatefulWidget {
@@ -37,6 +38,8 @@ class _AddTotpScreenState extends ConsumerState<AddTotpScreen>
 
   bool get _isDesktop =>
       Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+
+  bool get _isMobile => Platform.isAndroid || Platform.isIOS;
 
   @override
   void initState() {
@@ -104,7 +107,9 @@ class _AddTotpScreenState extends ConsumerState<AddTotpScreen>
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '上传包含二维码的图片，或将截图粘贴到此处，自动识别双重验证二维码。',
+                  _isMobile
+                      ? '使用相机扫描二维码，或上传包含二维码的图片，自动识别双重验证二维码。'
+                      : '上传包含二维码的图片，或将截图粘贴到此处，自动识别双重验证二维码。',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -118,6 +123,15 @@ class _AddTotpScreenState extends ConsumerState<AddTotpScreen>
         // 操作按钮
         Row(
           children: [
+            if (_isMobile)
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _isQrLoading ? null : _scanWithCamera,
+                  icon: const Icon(Icons.camera_alt, size: 18),
+                  label: const Text('扫一扫'),
+                ),
+              ),
+            if (_isMobile) const SizedBox(width: 12),
             Expanded(
               child: FilledButton.tonalIcon(
                 onPressed: _isQrLoading ? null : _pickQrImage,
@@ -374,6 +388,33 @@ class _AddTotpScreenState extends ConsumerState<AddTotpScreen>
 
   // ============ QR Code Methods ============
 
+  Future<void> _scanWithCamera() async {
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (context) => const _QrScannerScreen(),
+      ),
+    );
+
+    if (result != null && result.startsWith('otpauth://')) {
+      final success =
+          await ref.read(totpEntriesProvider.notifier).addFromUri(result);
+
+      if (mounted) {
+        if (success) {
+          Navigator.of(context).pop(true);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('无法解析此二维码，请检查是否为双重验证二维码')),
+          );
+        }
+      }
+    } else if (result != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('识别的二维码不是有效的验证器链接')),
+      );
+    }
+  }
+
   Future<void> _pickQrImage() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.image,
@@ -435,8 +476,8 @@ class _AddTotpScreenState extends ConsumerState<AddTotpScreen>
 
   Future<void> _decodeQrBytes(Uint8List imageBytes) async {
     try {
-      final decoder = QrCodeDartDecoder(
-        formats: [BarcodeFormat.qrCode],
+      final decoder = qr_decoder.QrCodeDartDecoder(
+        formats: [qr_decoder.BarcodeFormat.qrCode],
       );
       final result = await decoder.decodeFile(imageBytes);
 
@@ -572,5 +613,118 @@ class _AddTotpScreenState extends ConsumerState<AddTotpScreen>
         setState(() => _isLoading = false);
       }
     }
+  }
+}
+
+/// 二维码扫描页面
+class _QrScannerScreen extends StatefulWidget {
+  const _QrScannerScreen();
+
+  @override
+  State<_QrScannerScreen> createState() => _QrScannerScreenState();
+}
+
+class _QrScannerScreenState extends State<_QrScannerScreen> {
+  final MobileScannerController _controller = MobileScannerController();
+
+  bool _isProcessing = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_isProcessing) return;
+
+    final barcode = capture.barcodes.first;
+    if (barcode.rawValue == null) return;
+
+    final code = barcode.rawValue!;
+    if (code.startsWith('otpauth://')) {
+      setState(() => _isProcessing = true);
+      _controller.stop();
+      Navigator.of(context).pop(code);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('扫描二维码'),
+      ),
+      body: Stack(
+        children: [
+          // 相机预览
+          MobileScanner(
+            controller: _controller,
+            onDetect: _onDetect,
+          ),
+
+          // 扫描框遮罩
+          Center(
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: theme.colorScheme.primary,
+                  width: 3,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 50,
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 220),
+                  Container(
+                    width: 50,
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 提示文字
+          Positioned(
+            bottom: 80,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Text(
+                  '将二维码放入框内即可自动扫描',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
