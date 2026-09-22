@@ -9,6 +9,7 @@ import 'package:vaultsafe/shared/providers/settings_provider.dart';
 import 'package:vaultsafe/shared/models/password_entry.dart';
 import 'package:vaultsafe/shared/models/password_entry_type.dart';
 import 'package:vaultsafe/shared/models/password_group.dart';
+import 'package:vaultsafe/shared/models/password_sort_order.dart';
 import 'package:vaultsafe/core/encryption/encryption_service.dart';
 import 'package:vaultsafe/shared/utils/password_generator.dart';
 import 'package:vaultsafe/features/passwords/password_detail_screen.dart';
@@ -26,6 +27,7 @@ class PasswordsScreen extends ConsumerStatefulWidget {
 class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
   String _searchQuery = '';
   String? _selectedGroupId;
+  PasswordSortOrder _sortOrder = PasswordSortOrder.createdAtDescending;
   final Set<String> _selectedIds = {};
   bool _isSelectionMode = false;
   bool _isRightPanelOpen = false;
@@ -48,7 +50,18 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final entriesAsync = ref.watch(entriesByGroupProvider(_selectedGroupId));
+    final entriesAsync =
+        ref.watch(entriesByGroupProvider(_selectedGroupId)).whenData((entries) {
+      final query = _searchQuery.toLowerCase();
+      final filtered = query.isEmpty
+          ? entries
+          : entries
+              .where((entry) =>
+                  entry.title.toLowerCase().contains(query) ||
+                  entry.username.toLowerCase().contains(query))
+              .toList();
+      return _sortOrder.sort(filtered);
+    });
     final theme = Theme.of(context);
 
     // 桌面端布局
@@ -104,13 +117,7 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                   Expanded(
                     child: entriesAsync.when(
                       data: (entries) {
-                        final filtered = _searchQuery.isEmpty
-                            ? entries
-                            : entries.where((e) =>
-                                e.title.toLowerCase().contains(_searchQuery.toLowerCase()) || 
-                                e.username.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-
-                        if (filtered.isEmpty) {
+                        if (entries.isEmpty) {
                           return Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -137,7 +144,7 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
                           );
                         }
 
-                        return _buildDesktopGrid(filtered);
+                        return _buildDesktopGrid(entries);
                       },
                       loading: () => const Center(child: CircularProgressIndicator()),
                       error: (err, stack) => Center(child: Text('错误: $err')),
@@ -160,6 +167,7 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
           fontWeight: FontWeight.bold,
         ),),
         actions: [
+          _buildSortMenu(),
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: _showSearch,
@@ -195,17 +203,11 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
           Expanded(
             child: entriesAsync.when(
               data: (entries) {
-                final filtered = _searchQuery.isEmpty
-                    ? entries
-                    : entries.where((e) =>
-                        e.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                        e.username.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-
-                if (filtered.isEmpty) {
+                if (entries.isEmpty) {
                   return _buildEmptyState(theme);
                 }
 
-                return _buildMobileList(filtered);
+                return _buildMobileList(entries);
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (err, stack) => Center(child: Text('错误: $err')),
@@ -224,6 +226,22 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
               ),
             )
           : null,
+    );
+  }
+
+  Widget _buildSortMenu() {
+    return PopupMenuButton<PasswordSortOrder>(
+      tooltip: '排序：${_sortOrder.label}',
+      icon: const Icon(Icons.sort),
+      initialValue: _sortOrder,
+      onSelected: (order) => setState(() => _sortOrder = order),
+      itemBuilder: (context) => PasswordSortOrder.values.map((order) {
+        return CheckedPopupMenuItem<PasswordSortOrder>(
+          value: order,
+          checked: order == _sortOrder,
+          child: Text(order.label),
+        );
+      }).toList(),
     );
   }
 
@@ -274,6 +292,8 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
             ),
           ),
           const SizedBox(width: 16),
+          _buildSortMenu(),
+          const SizedBox(width: 12),
           // 新增按钮
           FilledButton.icon(
             onPressed: () => _toggleRightPanel(),
@@ -1247,7 +1267,7 @@ class _PasswordsScreenState extends ConsumerState<PasswordsScreen> {
   void _showSearch() {
     showSearch(
       context: context,
-      delegate: PasswordSearchDelegate(ref),
+      delegate: PasswordSearchDelegate(ref, sortOrder: _sortOrder),
     );
   }
 }
@@ -2277,8 +2297,12 @@ class _PasswordDetailPanelState extends ConsumerState<_PasswordDetailPanel> {
 /// 密码搜索代理
 class PasswordSearchDelegate extends SearchDelegate<String> {
   final WidgetRef ref;
+  final PasswordSortOrder sortOrder;
 
-  PasswordSearchDelegate(this.ref);
+  PasswordSearchDelegate(
+    this.ref, {
+    this.sortOrder = PasswordSortOrder.createdAtDescending,
+  });
 
   @override
   String get searchFieldLabel => '搜索密码';
@@ -2318,11 +2342,12 @@ class PasswordSearchDelegate extends SearchDelegate<String> {
 
     return entriesAsync.when(
       data: (entries) {
-        final results = query.isEmpty
+        final filtered = query.isEmpty
             ? entries
             : entries.where((e) =>
                 e.title.toLowerCase().contains(query.toLowerCase()) ||
                 e.username.toLowerCase().contains(query.toLowerCase())).toList();
+        final results = sortOrder.sort(filtered);
 
         if (results.isEmpty) {
           return const Center(child: Text('没有找到匹配的密码'));
